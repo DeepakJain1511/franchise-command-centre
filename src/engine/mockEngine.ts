@@ -25,6 +25,7 @@ import {
   type PinState,
   type Reason,
   type ScenarioChange,
+  type ScenarioPreset,
   type ScenarioResult,
   type Store,
   type Territory,
@@ -77,7 +78,7 @@ function buildNextSteps(appId: string, fx: DecisionFixture, plan: OnboardingPlan
     return plan.steps
       .filter((s) => s.state !== 'done')
       .slice(0, 3)
-      .map((s, i) => ({ id: `${appId}-n${i}`, label: `${s.step} complete`, owner: STEP_OWNER[s.step], dueDate: s.targetDate, done: false }))
+      .map((s, i) => ({ id: `${appId}-n${i}`, label: s.step === 'Open' ? 'Open the store' : `Finish ${s.step.toLowerCase()}`, owner: STEP_OWNER[s.step], dueDate: s.targetDate, done: false }))
       .concat(plan.current === 'Open' ? [{ id: `${appId}-n9`, label: '30-day store review', owner: 'Expansion team', dueDate: fromToday(20), done: false }] : []);
   }
   switch (fx.status) {
@@ -402,6 +403,11 @@ class MockEngine implements DecisionEngine {
       after: { status: scen.after.status, reasons: afterReasons, confidence: scen.after.conf },
       flipped, ripples: scen.ripples, sentence: scen.sentence,
     };
+  }
+
+  async getScenarioPresets(): Promise<ScenarioPreset[]> {
+    await delay(80);
+    return cannedScenarios.map((s) => ({ applicationId: s.applicationId, title: s.title, change: { applicationId: s.applicationId, ...s.preset } }));
   }
 
   async applyScenario(result: ScenarioResult) {

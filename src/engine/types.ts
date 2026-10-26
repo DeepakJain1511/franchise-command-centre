@@ -269,6 +269,12 @@ export interface ScenarioChange {
   investmentLakh?: number;
 }
 
+export interface ScenarioPreset {
+  applicationId: string;
+  title: string; // "APP-012 finds a ground-floor space"
+  change: ScenarioChange;
+}
+
 export interface Ripple {
   label: string; // "TER-03 open slots"
   before: string;
@@ -300,6 +306,8 @@ export interface DecisionEngine {
   explain(applicationId: string): Promise<Explanation>;
   ask(question: string): Promise<AskResponse>;
   simulate(change: ScenarioChange): Promise<ScenarioResult>;
+  /** Suggested what-if scenarios to offer as one-click chips. */
+  getScenarioPresets(): Promise<ScenarioPreset[]>;
   /** Commit a simulated scenario so every screen reflects it. */
   applyScenario(result: ScenarioResult): Promise<void>;
   revertScenario(scenarioId: string): Promise<void>;

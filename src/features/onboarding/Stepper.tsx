@@ -1,8 +1,14 @@
 import { Check, TriangleAlert } from 'lucide-react';
 import type { OnboardingPlan } from '@/engine/types';
-import { cn } from '@/lib/cn';
-import { DEMO_TODAY, fmtDate, iso } from '@/lib/time';
 import { Tooltip } from '@/components/ui/overlay';
+import { cn } from '@/lib/cn';
+import { DEMO_TODAY, fmtDate, iso, plusDays } from '@/lib/time';
+
+/** Grace before an active step counts as overdue. Agreement is never "overdue" (its target is day 0). */
+const GRACE_DAYS = 5;
+export function isStepOverdue(step: { step: string; state: string; targetDate: string }): boolean {
+  return step.state === 'active' && step.step !== 'Agreement' && step.step !== 'Open' && plusDays(step.targetDate, GRACE_DAYS) < iso(DEMO_TODAY);
+}
 
 const SHORT: Record<string, string> = {
   Agreement: 'Agreement',
@@ -16,11 +22,10 @@ const SHORT: Record<string, string> = {
 
 /** Horizontal stepper: status dots + target dates. Overdue active step turns amber. */
 export function OnboardingStepper({ plan, compact = false }: { plan: OnboardingPlan; compact?: boolean }) {
-  const today = iso(DEMO_TODAY);
   return (
     <ol className="flex w-full items-start" aria-label="Onboarding stages">
       {plan.steps.map((s, i) => {
-        const overdue = s.state === 'active' && s.targetDate < today;
+        const overdue = isStepOverdue(s);
         const risky = s.state === 'active' && (overdue || plan.atRisk);
         return (
           <li key={s.step} className="relative flex min-w-0 flex-1 flex-col items-center text-center">

@@ -68,3 +68,24 @@ export function useMediaQuery(q: string) {
 }
 
 export const useReducedMotion = () => useMediaQuery('(prefers-reduced-motion: reduce)');
+
+/** View switch kept in the URL (?view=…) so each view is linkable. */
+export function useView<T extends string>(allowed: readonly T[], fallback: T): [T, (v: T) => void] {
+  const [params, setParams] = useSearchParams();
+  const raw = params.get('view');
+  const view = allowed.includes(raw as T) ? (raw as T) : fallback;
+  const setView = useCallback(
+    (v: T) =>
+      setParams(
+        (p) => {
+          const n = new URLSearchParams(p);
+          if (v === fallback) n.delete('view');
+          else n.set('view', v);
+          return n;
+        },
+        { replace: true },
+      ),
+    [setParams, fallback],
+  );
+  return [view, setView];
+}

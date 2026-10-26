@@ -2,12 +2,12 @@
  * The ONLY way components talk to the engine. Each hook caches by (data version, key)
  * and keeps the previous value while refetching so widgets crossfade instead of blanking.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useData } from '@/store/data';
 import { useFilters } from '@/store/filters';
 import { applyFilters, type ApplicantRow } from '@/lib/filtering';
 import { engine } from './index';
-import type { Dataset, Decision, Explanation, PinState, TerritoryState } from './types';
+import type { Dataset, Decision, Explanation, PinState, ScenarioChange, ScenarioPreset, ScenarioResult, TerritoryState } from './types';
 
 const cache = new Map<string, Promise<unknown>>();
 
@@ -49,6 +49,46 @@ export const usePinStates = () => useEngineQuery<PinState[]>('pins', () => engin
 export const useTerritoryStates = () => useEngineQuery<TerritoryState[]>('territories', () => engine.getTerritoryState());
 export const useExplanation = (id: string | null) =>
   useEngineQuery<Explanation>(`explain:${id}`, () => engine.explain(id!), !!id);
+
+export const useScenarioPresets = () => useEngineQuery<ScenarioPreset[]>('presets', () => engine.getScenarioPresets());
+
+/* ---------------- Actions (ask / simulate / apply / revert) ---------------- */
+
+function useAction<A extends unknown[], R>(fn: (...args: A) => Promise<R>) {
+  const [loading, setLoading] = useState(false);
+  const run = useCallback(
+    async (...args: A): Promise<R> => {
+      setLoading(true);
+      try {
+        return await fn(...args);
+      } finally {
+        setLoading(false);
+      }
+    },
+    // fn is a stable module-level engine call
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  return { run, loading };
+}
+
+export const useAsk = () => useAction((q: string) => engine.ask(q));
+export const useSimulate = () => useAction((c: ScenarioChange) => engine.simulate(c));
+
+/** Commit / undo a simulated scenario; every screen refetches afterwards. */
+export function useScenarioCommit() {
+  const apply = useAction(async (r: ScenarioResult) => {
+    await engine.applyScenario(r);
+    useData.getState().markApplied(r.id, true);
+    useData.getState().bump();
+  });
+  const revert = useAction(async (id: string) => {
+    await engine.revertScenario(id);
+    useData.getState().markApplied(id, false);
+    useData.getState().bump();
+  });
+  return { apply: apply.run, revert: revert.run, busy: apply.loading || revert.loading };
+}
 
 /** Applications joined with their decision and territory (presentation join only). */
 export function useApplicants(): Query<ApplicantRow[]> {
