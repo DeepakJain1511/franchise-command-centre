@@ -45,17 +45,17 @@ export function StartBackdrop() {
           transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
           className="absolute inset-0 h-full w-full object-cover"
         />
-        {/* soft wash keeps text calm and readable in both themes */}
-        <div className="absolute inset-0 bg-gradient-to-b from-bg/70 via-bg/80 to-bg/95" />
-        <div className="absolute inset-0 [background:radial-gradient(70%_55%_at_50%_30%,hsl(var(--bg)/0.55),transparent_75%)]" />
+        {/* dark gradient on the left keeps the headline readable; the photo stays vivid on the right */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[#121a22]/90 via-[#121a22]/60 to-[#121a22]/25" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#121a22]/70 via-transparent to-[#121a22]/30" />
       </div>
-      <p className="fixed bottom-2 right-3 z-10 text-[10px] text-subtle">
+      <p className="fixed bottom-3 left-5 z-10 text-[10px] text-white/55 md:left-10">
         Photo:{' '}
-        <a href={AUTHOR_PAGE} target="_blank" rel="noreferrer" className="hover:text-fg hover:underline">
+        <a href={AUTHOR_PAGE} target="_blank" rel="noreferrer" className="hover:text-white hover:underline">
           ABHIRAM PH
         </a>{' '}
         on{' '}
-        <a href={PHOTO_PAGE} target="_blank" rel="noreferrer" className="hover:text-fg hover:underline">
+        <a href={PHOTO_PAGE} target="_blank" rel="noreferrer" className="hover:text-white hover:underline">
           Unsplash
         </a>
       </p>

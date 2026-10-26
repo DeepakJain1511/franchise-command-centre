@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  AlertTriangle, ArrowRight, Check, CheckCircle2, Download, FileSpreadsheet, Hexagon, Loader2, Moon, RotateCcw, Sparkles, Sun, Swords, TriangleAlert, Upload, Users,
+  AlertTriangle, ArrowRight, MapPin, Check, CheckCircle2, Download, FileSpreadsheet, Hexagon, Loader2, Moon, RotateCcw, Sparkles, Sun, Swords, TriangleAlert, Upload, Users,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -88,126 +88,164 @@ export default function StartPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-bg">
+    <div className="relative min-h-screen overflow-hidden bg-[#1c2630]">
       <StartBackdrop />
 
-      <header className="relative flex items-center gap-3 px-4 py-4 md:px-8">
-        <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-brand text-brand-fg shadow-soft">
+      <header className="relative z-10 flex items-center gap-3 px-5 py-5 text-white md:px-10">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/25 backdrop-blur">
           <Hexagon className="h-4 w-4" strokeWidth={2.5} />
         </span>
-        <span className="text-sm font-semibold tracking-tight">Bunty Consulting</span>
+        <span className="text-[15px] font-semibold tracking-tight">Bunty Consulting</span>
         <div className="ml-auto flex items-center gap-1">
           {loaded && phase === 'idle' && (
-            <Button variant="ghost" size="sm" onClick={() => navigate('/overview')}>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/overview')} className="text-white/85 hover:bg-white/10 hover:text-white">
               Back to dashboard <ArrowRight />
             </Button>
           )}
-          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
+          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme" className="text-white/85 hover:bg-white/10 hover:text-white">
             {theme === 'dark' ? <Sun /> : <Moon />}
           </Button>
         </div>
       </header>
 
-      <main className="relative mx-auto flex max-w-2xl flex-col items-center px-4 pb-16 pt-6 text-center md:pt-12">
-        <Reveal>
-          <h1 className="text-balance text-3xl font-semibold tracking-tight md:-mx-24 md:text-[44px] md:leading-[1.08]">
-            From applications to <span className="text-brand">open stores.</span>
-          </h1>
-        </Reveal>
-        <Reveal delay={0.08}>
-          <p className="mt-3 text-base text-muted">Upload the Excel. See who to approve, where, and why.</p>
-        </Reveal>
+      <main className="relative z-10 mx-auto grid max-w-7xl items-center gap-10 px-5 pb-14 pt-4 md:px-10 lg:min-h-[calc(100vh-84px)] lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:pt-0">
+        {/* Left: editorial headline over the photo */}
+        <section className="text-white">
+          <Reveal>
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1 text-xs font-medium text-white/90 ring-1 ring-white/20 backdrop-blur">
+              <span className="h-1.5 w-1.5 rounded-full bg-[hsl(38_85%_68%)]" /> Franchise expansion · Karnataka
+            </span>
+          </Reveal>
+          <Reveal delay={0.06}>
+            <h1 className="mt-5 text-[40px] font-semibold leading-[1.04] tracking-[-0.02em] sm:text-5xl lg:text-[64px]">
+              From applications
+              <br />
+              to <span className="text-[hsl(38_85%_72%)]">open stores.</span>
+            </h1>
+          </Reveal>
+          <Reveal delay={0.12}>
+            <p className="mt-5 max-w-md text-lg leading-relaxed text-white/80">
+              Drop in the Excel. See who to approve, where the gaps are, and exactly why — in seconds.
+            </p>
+          </Reveal>
+          <Reveal delay={0.18}>
+            <ul className="mt-8 hidden max-w-lg gap-3 sm:grid sm:grid-cols-3">
+              {[
+                { icon: <Users />, t: 'Every applicant', d: 'scored & explained' },
+                { icon: <MapPin />, t: 'Every PIN', d: 'mapped, one store each' },
+                { icon: <Sparkles />, t: 'Every what-if', d: 'answered live' },
+              ].map((f) => (
+                <li key={f.t} className="rounded-2xl bg-white/10 p-3.5 ring-1 ring-white/15 backdrop-blur-md transition-colors hover:bg-white/15">
+                  <span className="text-[hsl(38_85%_72%)] [&_svg]:size-4">{f.icon}</span>
+                  <div className="mt-2 text-sm font-semibold">{f.t}</div>
+                  <div className="text-xs text-white/70">{f.d}</div>
+                </li>
+              ))}
+            </ul>
+          </Reveal>
+        </section>
 
-        <AnimatePresence mode="wait">
-          {(phase === 'idle' || phase === 'error') && (
-            <motion.div key="idle" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="mt-8 w-full">
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => inputRef.current?.click()}
-                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), inputRef.current?.click())}
-                onDragOver={(e) => (e.preventDefault(), setDrag(true))}
-                onDragLeave={() => setDrag(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDrag(false);
-                  onFiles(e.dataTransfer.files);
-                }}
-                aria-label="Upload Excel file: drop it here or press Enter to browse"
-                className={cn(
-                  'card group flex cursor-pointer flex-col items-center gap-4 border-2 border-dashed bg-surface/80 px-6 py-10 backdrop-blur-md transition-all duration-300 focus-ring',
-                  drag ? 'scale-[1.02] border-brand bg-brand-soft/90 shadow-pop' : 'hover:-translate-y-0.5 hover:border-brand/50 hover:shadow-lift',
-                )}
-              >
-                <motion.span
-                  animate={drag ? { scale: 1.15, y: -4 } : { scale: 1, y: [0, -4, 0] }}
-                  transition={drag ? { type: 'spring', stiffness: 300, damping: 15 } : { duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
-                  className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-soft text-brand"
-                >
-                  <Upload className="h-6 w-6" />
-                </motion.span>
-                <div>
-                  <p className="text-lg font-semibold">{drag ? 'Release to upload' : 'Drop your Excel here'}</p>
-                  <p className="text-sm text-muted">or click to browse · .xlsx</p>
-                </div>
-                <div className="flex flex-wrap justify-center gap-2" aria-label="Expected sheets">
-                  <SheetChip name="Applications" />
-                  <SheetChip name="Territories" />
-                  <SheetChip name="Existing stores" builtIn />
-                </div>
-                <input ref={inputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => onFiles(e.target.files)} />
-              </div>
+        {/* Right: one crisp card that holds every step */}
+        <Reveal delay={0.1}>
+          <section className="rounded-[28px] bg-surface/95 p-5 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.45)] ring-1 ring-white/40 backdrop-blur-xl sm:p-7" aria-label="Upload">
+            <AnimatePresence mode="wait">
+              {(phase === 'idle' || phase === 'error') && (
+                <motion.div key="idle" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                  <h2 className="text-lg font-semibold tracking-tight">Start with your data</h2>
+                  <p className="mt-0.5 text-sm text-muted">The judges' Excel template, as-is.</p>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => inputRef.current?.click()}
+                    onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), inputRef.current?.click())}
+                    onDragOver={(e) => (e.preventDefault(), setDrag(true))}
+                    onDragLeave={() => setDrag(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDrag(false);
+                      onFiles(e.dataTransfer.files);
+                    }}
+                    aria-label="Upload Excel file: drop it here or press Enter to browse"
+                    className={cn(
+                      'group mt-5 flex cursor-pointer flex-col items-center gap-4 rounded-2xl border-2 border-dashed px-6 py-9 text-center transition-all duration-300 focus-ring',
+                      drag ? 'scale-[1.02] border-brand bg-brand-soft' : 'border-border bg-raised/50 hover:border-brand/50 hover:bg-brand-soft/50',
+                    )}
+                  >
+                    <motion.span
+                      animate={drag ? { scale: 1.15, y: -4 } : { scale: 1, y: [0, -4, 0] }}
+                      transition={drag ? { type: 'spring', stiffness: 300, damping: 15 } : { duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+                      className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-brand-fg shadow-lift"
+                    >
+                      <Upload className="h-6 w-6" />
+                    </motion.span>
+                    <div>
+                      <p className="text-base font-semibold">{drag ? 'Release to upload' : 'Drop your Excel here'}</p>
+                      <p className="text-sm text-muted">or click to browse · .xlsx</p>
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-2" aria-label="Expected sheets">
+                      <SheetChip name="Applications" />
+                      <SheetChip name="Territories" />
+                      <SheetChip name="Existing stores" builtIn />
+                    </div>
+                    <input ref={inputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => onFiles(e.target.files)} />
+                  </div>
 
-              {phase === 'error' && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} role="alert" className="mt-4 rounded-lg border border-st-rejected/30 bg-st-rejected/[0.06] p-4 text-left">
-                  <p className="flex items-center gap-2 text-sm font-semibold text-st-rejected">
-                    <AlertTriangle className="h-4 w-4" /> {fileName ?? 'This file'} needs a fix
-                  </p>
-                  <ul className="mt-2 space-y-1 text-sm">
-                    {errors.map((e) => (
-                      <li key={e} className="flex gap-2">
-                        <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-st-rejected" aria-hidden /> {e}
-                      </li>
-                    ))}
-                  </ul>
-                  {check && <SheetSummary check={check} className="mt-3" />}
+                  {phase === 'error' && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} role="alert" className="mt-4 rounded-xl border border-st-rejected/30 bg-st-rejected/[0.06] p-4 text-left">
+                      <p className="flex items-center gap-2 text-sm font-semibold text-st-rejected">
+                        <AlertTriangle className="h-4 w-4" /> {fileName ?? 'This file'} needs a fix
+                      </p>
+                      <ul className="mt-2 space-y-1 text-sm">
+                        {errors.map((e) => (
+                          <li key={e} className="flex gap-2">
+                            <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-st-rejected" aria-hidden /> {e}
+                          </li>
+                        ))}
+                      </ul>
+                      {check && <SheetSummary check={check} className="mt-3" />}
+                    </motion.div>
+                  )}
+
+                  <div className="mt-5 flex items-center gap-3">
+                    <span className="h-px flex-1 bg-border" />
+                    <span className="text-2xs uppercase tracking-wider text-subtle">or</span>
+                    <span className="h-px flex-1 bg-border" />
+                  </div>
+                  <Button variant="primary" size="lg" onClick={() => run('sample')} className="group relative mt-5 w-full overflow-hidden rounded-xl shadow-lift">
+                    <span aria-hidden className="pointer-events-none absolute inset-y-0 -left-1/2 w-1/3 -skew-x-12 bg-white/25 opacity-0 transition-all duration-700 group-hover:left-[120%] group-hover:opacity-100" />
+                    <Sparkles /> Try with sample data
+                  </Button>
+                  <div className="mt-3 flex items-center justify-between text-xs text-muted">
+                    <a href="/Case1_Franchise_Test_Data_Format.xlsx" download className="inline-flex items-center gap-1.5 hover:text-fg focus-ring">
+                      <Download className="h-3.5 w-3.5" /> Download template
+                    </a>
+                    <span>No login · ~5 seconds</span>
+                  </div>
                 </motion.div>
               )}
 
-              <div className="mt-6 flex flex-col items-center gap-3">
-                <Button variant="primary" size="lg" onClick={() => run('sample')} className="group relative min-w-64 overflow-hidden shadow-lift">
-                  <span aria-hidden className="pointer-events-none absolute inset-y-0 -left-1/2 w-1/3 -skew-x-12 bg-white/25 opacity-0 transition-all duration-700 group-hover:left-[120%] group-hover:opacity-100" />
-                  <Sparkles /> Try with sample data
-                </Button>
-                <a href="/Case1_Franchise_Test_Data_Format.xlsx" download className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg focus-ring">
-                  <Download className="h-4 w-4" /> Download template
-                </a>
-              </div>
-            </motion.div>
-          )}
+              {phase === 'processing' && (
+                <motion.div key="proc" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                  <ProcessingView stage={stage} fileName={fileName} fileSize={fileSize} />
+                </motion.div>
+              )}
 
-          {phase === 'processing' && (
-            <motion.div key="proc" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="card mt-8 w-full bg-surface/90 p-6 backdrop-blur-md">
-              <ProcessingView stage={stage} fileName={fileName} fileSize={fileSize} />
-            </motion.div>
-          )}
-
-          {phase === 'done' && (
-            <motion.div key="done" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-8 w-full">
-              <Summary fileName={fileName} check={check} />
-              <Button variant="primary" size="lg" className="mt-6 min-w-64 shadow-lift" onClick={() => navigate('/overview')} autoFocus>
-                Open dashboard <ArrowRight />
-              </Button>
-              <div className="mt-3">
-                <button type="button" onClick={() => setPhase('idle')} className="inline-flex items-center gap-1 text-xs text-subtle hover:text-fg focus-ring">
-                  <RotateCcw className="h-3 w-3" /> Start over
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <p className="mt-10 text-2xs text-subtle">Phase 1 demo · decisions come from sample fixtures · no login needed</p>
+              {phase === 'done' && (
+                <motion.div key="done" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                  <Summary fileName={fileName} check={check} />
+                  <Button variant="primary" size="lg" className="mt-5 w-full rounded-xl shadow-lift" onClick={() => navigate('/overview')} autoFocus>
+                    Open dashboard <ArrowRight />
+                  </Button>
+                  <div className="mt-3 text-center">
+                    <button type="button" onClick={() => setPhase('idle')} className="inline-flex items-center gap-1 text-xs text-subtle hover:text-fg focus-ring">
+                      <RotateCcw className="h-3 w-3" /> Start over
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </section>
+        </Reveal>
       </main>
       <Toaster />
     </div>
@@ -300,7 +338,7 @@ function Summary({ fileName, check }: { fileName: string | null; check: Workbook
   const rows = preview === 'apps' ? apps.data : preview === 'flags' ? flagged : preview === 'competing' ? competing : [];
 
   return (
-    <div className="card bg-surface/90 p-5 text-left backdrop-blur-md">
+    <div className="text-left">
       <div className="flex items-center gap-2">
         <CheckCircle2 className="h-5 w-5 text-st-approved" />
         <p className="font-semibold">Ready</p>
