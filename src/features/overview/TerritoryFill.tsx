@@ -33,7 +33,7 @@ export function TerritoryFill() {
       drillLabel="Open territory detail"
       actions={
         sel && (
-          <Button size="sm" variant="secondary" onClick={() => navigate(`/map?focus=${sel}`)}>
+          <Button size="sm" variant="secondary" onClick={() => navigate(`/map?territory=${sel}`)}>
             <Map /> Open on map
           </Button>
         )

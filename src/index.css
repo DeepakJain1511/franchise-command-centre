@@ -115,3 +115,11 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
+
+.fcc-pinlabel {
+  display: inline-block; transform: translate(-50%, -50%);
+  font: 600 10px Inter, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: .01em;
+  color: hsl(var(--fg)); text-shadow: 0 0 3px hsl(var(--surface)), 0 0 3px hsl(var(--surface)), 0 0 2px hsl(var(--surface));
+  pointer-events: none; white-space: nowrap;
+}
+.fcc-pinlabel.fcc-up { transform: translate(-50%, -170%); }
