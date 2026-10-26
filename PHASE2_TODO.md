@@ -24,6 +24,7 @@ No UI component needs to change: screens only use the hooks in `src/engine/hooks
 | `getPinStates()` | Derived from fixtures: store → allocated → outside → conflict (≥2 live applicants) → interest → open/full | Add "too close to an existing store" conflicts and real catchment analysis | `mockEngine.ts` → `pinStatesSync` |
 | `getPartnerProfile(id)` | Manager by territory/city, payback from tier assumptions, seeded chat | Real CRM assignment, real P&L model per store, message history | `data/mock/partner.ts`, `mockEngine.ts` → `getPartnerProfile` |
 | `sendPartnerMessage(id, text)` | Keyword-matched canned replies after a short delay | Real two-way messaging (backend + notifications) | `mockEngine.ts` → `sendPartnerMessage` |
+| `getStaff` · `addStaff` · `assignStaffModule` · `completeStaffModule` · `removeStaff` | In-memory roster seeded by onboarding stage; quiz scores are deterministic demo numbers; certificate when all assigned modules ≥ 70% | Real staff records, LMS progress and real quizzes; PDF certificates | `data/mock/staff.ts`, `mockEngine.ts` → staff methods |
 
 ## Data that is demo-only
 

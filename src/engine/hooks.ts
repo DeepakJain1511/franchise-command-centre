@@ -7,7 +7,7 @@ import { useData } from '@/store/data';
 import { useFilters } from '@/store/filters';
 import { applyFilters, type ApplicantRow } from '@/lib/filtering';
 import { engine } from './index';
-import type { Dataset, Decision, Explanation, PartnerProfile, PinState, ScenarioChange, ScenarioPreset, ScenarioResult, TerritoryState } from './types';
+import type { Dataset, Decision, Explanation, Language, PartnerProfile, PinState, ScenarioChange, ScenarioPreset, ScenarioResult, StaffRole, StaffRoster, TerritoryState } from './types';
 
 const cache = new Map<string, Promise<unknown>>();
 
@@ -77,6 +77,15 @@ function useAction<A extends unknown[], R>(fn: (...args: A) => Promise<R>) {
 export const useAsk = () => useAction((q: string) => engine.ask(q));
 export const useSimulate = () => useAction((c: ScenarioChange) => engine.simulate(c));
 export const useSendPartnerMessage = () => useAction((id: string, text: string) => engine.sendPartnerMessage(id, text));
+export const useStaffRoster = (id: string | null) => useEngineQuery<StaffRoster>(`staff:${id}`, () => engine.getStaff(id!), !!id);
+/** Staff actions resolve with the updated roster. */
+export function useStaffActions() {
+  const add = useAction((id: string, s: { name: string; role: StaffRole; language: Language }) => engine.addStaff(id, s));
+  const assign = useAction((id: string, staffId: string, moduleId: string) => engine.assignStaffModule(id, staffId, moduleId));
+  const complete = useAction((id: string, staffId: string, moduleId: string) => engine.completeStaffModule(id, staffId, moduleId));
+  const remove = useAction((id: string, staffId: string) => engine.removeStaff(id, staffId));
+  return { add: add.run, assign: assign.run, complete: complete.run, remove: remove.run, busy: add.loading || assign.loading || complete.loading || remove.loading };
+}
 
 /** Commit / undo a simulated scenario; every screen refetches afterwards. */
 export function useScenarioCommit() {

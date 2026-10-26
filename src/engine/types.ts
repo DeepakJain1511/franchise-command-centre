@@ -325,6 +325,43 @@ export interface PartnerProfile {
   messages: ChatMessage[];
 }
 
+export const STAFF_ROLES = ['Store manager', 'Optometrist', 'Sales associate'] as const;
+export type StaffRole = (typeof STAFF_ROLES)[number];
+
+export interface StaffModule {
+  id: string;
+  title: string;
+  hours: number;
+  /** Roles this module is recommended for (auto-assigned on joining). */
+  forRoles: StaffRole[];
+}
+
+export interface StaffModuleProgress {
+  moduleId: string;
+  assignedAt: string;
+  progress: number; // 0..1
+  quizScore: number | null; // % once completed
+  completedAt: string | null;
+}
+
+export interface StaffMember {
+  id: string;
+  name: string;
+  role: StaffRole;
+  language: Language;
+  joinedAt: string;
+  modules: StaffModuleProgress[];
+  /** Set when every assigned module is passed (quiz ≥ pass mark). */
+  certifiedAt: string | null;
+}
+
+export interface StaffRoster {
+  applicationId: string;
+  catalog: StaffModule[];
+  passMark: number;
+  members: StaffMember[];
+}
+
 /* ------------------------------------------------------------------ */
 /* The seam                                                           */
 /* ------------------------------------------------------------------ */
@@ -347,5 +384,12 @@ export interface DecisionEngine {
   getPartnerProfile(applicationId: string): Promise<PartnerProfile>;
   /** Partner sends a message; resolves with the brand's reply. */
   sendPartnerMessage(applicationId: string, text: string): Promise<ChatMessage>;
+  /** Partner's own staff and their training. */
+  getStaff(applicationId: string): Promise<StaffRoster>;
+  addStaff(applicationId: string, staff: { name: string; role: StaffRole; language: Language }): Promise<StaffRoster>;
+  assignStaffModule(applicationId: string, staffId: string, moduleId: string): Promise<StaffRoster>;
+  /** Record a module as finished (the demo also produces a quiz score). */
+  completeStaffModule(applicationId: string, staffId: string, moduleId: string): Promise<StaffRoster>;
+  removeStaff(applicationId: string, staffId: string): Promise<StaffRoster>;
   reset(): Promise<void>;
 }

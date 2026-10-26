@@ -9,6 +9,7 @@ import { decisionFixtures, STEP_OFFSETS, STEP_OWNER, TRAINING_MODULES, type Deci
 import { cityCentres, pincodes } from '@/data/mock/pincodes';
 import { cannedReplies, defaultReply, economicsByTier, managersByCity, managersByTerritory } from '@/data/mock/partner';
 import { cannedScenarios } from '@/data/mock/scenarios';
+import { seedStaffNames, staffCatalog, STAFF_PASS_MARK } from '@/data/mock/staff';
 import { stores as storeFixtures } from '@/data/mock/stores';
 import { territories as territoryFixtures } from '@/data/mock/territories';
 import { dataFlagsFor } from '@/lib/dataQuality';
@@ -24,12 +25,16 @@ import {
   type Explanation,
   type NextStep,
   type OnboardingPlan,
+  type Language,
   type PartnerProfile,
   type PinState,
   type Reason,
   type ScenarioChange,
   type ScenarioPreset,
   type ScenarioResult,
+  type StaffMember,
+  type StaffRole,
+  type StaffRoster,
   type Store,
   type Territory,
   type TerritoryState,
@@ -479,6 +484,109 @@ class MockEngine implements DecisionEngine {
     return msg;
   }
 
+  /* -------------------------- Staff training -------------------------- */
+
+  private rosters = new Map<string, StaffMember[]>();
+
+  private score(staffId: string, moduleId: string) {
+    // Deterministic demo quiz score, 74–97.
+    const h = [...`${staffId}${moduleId}`].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) % 997, 7);
+    return 74 + (h % 24);
+  }
+
+  private certify(m: StaffMember): StaffMember {
+    const passed = m.modules.length > 0 && m.modules.every((x) => x.progress >= 1 && (x.quizScore ?? 0) >= STAFF_PASS_MARK);
+    const last = m.modules.map((x) => x.completedAt ?? '').sort().pop() || iso(DEMO_TODAY);
+    return { ...m, certifiedAt: passed ? m.certifiedAt ?? last : null };
+  }
+
+  private newMember(appId: string, n: number, name: string, role: StaffRole, language: Language, joinedAt: string): StaffMember {
+    const id = `${appId}-ST${n}`;
+    return {
+      id, name, role, language, joinedAt, certifiedAt: null,
+      modules: staffCatalog.filter((c) => c.forRoles.includes(role)).map((c) => ({ moduleId: c.id, assignedAt: joinedAt, progress: 0, quizScore: null, completedAt: null })),
+    };
+  }
+
+  private roster(appId: string): StaffMember[] {
+    if (this.rosters.has(appId)) return this.rosters.get(appId)!;
+    const app = this.applications.find((a) => a.id === appId);
+    const plan = app ? buildOnboarding(this.fixtures[appId]) : null;
+    let members: StaffMember[] = [];
+    if (app && plan) {
+      // PHASE-2: real logic goes here — staff come from the partner / LMS, not a seed.
+      const stage = ONBOARDING_STEPS.indexOf(plan.current);
+      const training = ONBOARDING_STEPS.indexOf('Training');
+      const names = seedStaffNames[app.language].slice(0, stage < training ? 1 : 3);
+      members = names.map(([name, role], i) => {
+        const m = this.newMember(appId, i + 1, name, role, app.language, plan.startDate);
+        const doneShare = stage > training ? 1 : stage === training ? [1, 0.5, 0.34][i] : 0.34;
+        const nDone = Math.round(m.modules.length * doneShare);
+        m.modules = m.modules.map((x, k) =>
+          k < nDone
+            ? { ...x, progress: 1, quizScore: this.score(m.id, x.moduleId), completedAt: plusDays(plan.startDate, 40 + k * 3) }
+            : k === nDone && stage >= training
+              ? { ...x, progress: 0.5 }
+              : x,
+        );
+        return this.certify(m);
+      });
+    }
+    this.rosters.set(appId, members);
+    return members;
+  }
+
+  private rosterOut(appId: string): StaffRoster {
+    return { applicationId: appId, catalog: staffCatalog, passMark: STAFF_PASS_MARK, members: clone(this.roster(appId)) };
+  }
+
+  async getStaff(applicationId: string) {
+    await delay(120);
+    return this.rosterOut(applicationId);
+  }
+
+  async addStaff(applicationId: string, s: { name: string; role: StaffRole; language: Language }) {
+    await delay(200);
+    const list = this.roster(applicationId);
+    list.push(this.newMember(applicationId, list.length + 1 + Math.floor(Math.random() * 1000), s.name.trim(), s.role, s.language, iso(DEMO_TODAY)));
+    return this.rosterOut(applicationId);
+  }
+
+  async assignStaffModule(applicationId: string, staffId: string, moduleId: string) {
+    await delay(150);
+    const list = this.roster(applicationId);
+    const i = list.findIndex((m) => m.id === staffId);
+    if (i >= 0 && !list[i].modules.some((x) => x.moduleId === moduleId)) {
+      list[i] = this.certify({
+        ...list[i],
+        certifiedAt: null,
+        modules: [...list[i].modules, { moduleId, assignedAt: iso(DEMO_TODAY), progress: 0, quizScore: null, completedAt: null }],
+      });
+    }
+    return this.rosterOut(applicationId);
+  }
+
+  async completeStaffModule(applicationId: string, staffId: string, moduleId: string) {
+    await delay(350);
+    const list = this.roster(applicationId);
+    const i = list.findIndex((m) => m.id === staffId);
+    if (i >= 0) {
+      list[i] = this.certify({
+        ...list[i],
+        modules: list[i].modules.map((x) =>
+          x.moduleId === moduleId ? { ...x, progress: 1, quizScore: this.score(staffId, moduleId), completedAt: iso(DEMO_TODAY) } : x,
+        ),
+      });
+    }
+    return this.rosterOut(applicationId);
+  }
+
+  async removeStaff(applicationId: string, staffId: string) {
+    await delay(120);
+    this.rosters.set(applicationId, this.roster(applicationId).filter((m) => m.id !== staffId));
+    return this.rosterOut(applicationId);
+  }
+
   async getScenarioPresets(): Promise<ScenarioPreset[]> {
     await delay(80);
     return cannedScenarios.map((s) => ({ applicationId: s.applicationId, title: s.title, change: { applicationId: s.applicationId, ...s.preset } }));
@@ -533,6 +641,7 @@ class MockEngine implements DecisionEngine {
     this.fixtures = clone(decisionFixtures);
     this.applied.clear();
     this.threads.clear();
+    this.rosters.clear();
     this.source = 'sample';
     this.fileName = undefined;
   }

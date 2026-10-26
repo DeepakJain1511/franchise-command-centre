@@ -22,6 +22,7 @@ import { useUi } from '@/store/ui';
 import { loadDataset } from '@/lib/actions';
 import { usePartnerProfile } from '@/engine/hooks';
 import { ChatCard, ExtrasSkeleton, ManagerCard, PaybackCard } from './PartnerExtras';
+import { StaffTraining } from './StaffTraining';
 
 /** What each stage means, in the partner's words. */
 const STAGE_COPY: Record<OnboardingStep, { what: string; you: string }> = {
@@ -273,6 +274,10 @@ function OnboardingPortal({ row, plan }: { row: ApplicantRow; plan: OnboardingPl
 
       <Reveal delay={0.22}>
         <TrainingSection row={row} plan={plan} />
+      </Reveal>
+
+      <Reveal delay={0.26}>
+        <StaffTraining appId={app.id} storeName={`Bunty ${pin?.area ?? app.city}`} partnerLanguage={app.language} managerName={profile.data?.manager.name ?? "Bunty team"} />
       </Reveal>
     </div>
   );
