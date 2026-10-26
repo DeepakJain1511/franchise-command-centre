@@ -83,6 +83,8 @@ export interface Dataset {
   applications: Application[];
   territories: Territory[];
   stores: Store[];
+  /** City centre points for state-level map markers. */
+  cities: Array<{ city: City; lat: number; lng: number }>;
   loadedAt: string;
 }
 

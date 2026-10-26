@@ -6,7 +6,7 @@
  */
 import { applications as appFixtures } from '@/data/mock/applications';
 import { decisionFixtures, STEP_OFFSETS, STEP_OWNER, TRAINING_MODULES, type DecisionFixture, type ReasonTuple } from '@/data/mock/decisions';
-import { pincodes } from '@/data/mock/pincodes';
+import { cityCentres, pincodes } from '@/data/mock/pincodes';
 import { cannedScenarios } from '@/data/mock/scenarios';
 import { stores as storeFixtures } from '@/data/mock/stores';
 import { territories as territoryFixtures } from '@/data/mock/territories';
@@ -157,6 +157,7 @@ class MockEngine implements DecisionEngine {
       applications: clone(this.applications),
       territories: clone(this.territories),
       stores: clone(this.stores),
+      cities: (Object.keys(cityCentres) as Array<keyof typeof cityCentres>).map((city) => ({ city, ...cityCentres[city] })),
       loadedAt: this.loadedAt,
     };
   }

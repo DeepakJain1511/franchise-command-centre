@@ -3,16 +3,24 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Circle, MapContainer, Marker, Polygon, Polyline, TileLayer, Tooltip, ZoomControl, useMap, useMapEvents } from 'react-leaflet';
 import type { PinState } from '@/engine/types';
 import type { HexCell } from '@/lib/hex';
+import { KARNATAKA_OUTLINE } from '@/data/geo/karnataka';
 import { useColors, useReducedMotion } from '@/lib/hooks';
-import { PIN_META, PRIORITY_META } from '@/lib/tokens';
+import { PIN_META, PRIORITY_META, tokenColor } from '@/lib/tokens';
 import { useFilters } from '@/store/filters';
 import { useUi } from '@/store/ui';
 import { cannibalisationPins, useMapUi, type MapModel } from './model';
 
 export const KARNATAKA: LatLngBoundsExpression = [
-  [11.6, 74.0],
-  [16.5, 78.4],
+  [11.55, 74.05],
+  [18.5, 78.6],
 ];
+const WORLD: Array<[number, number]> = [
+  [-89, -179],
+  [-89, 179],
+  [89, 179],
+  [89, -179],
+];
+
 /** Below this zoom we show city bubbles (state level). */
 export const CITY_ZOOM = 9.5;
 
@@ -56,8 +64,17 @@ function Controller({ model, onZoom, onView, onReady, rightPad }: {
 
   useEffect(() => {
     onReady(map);
-    onZoom(map.getZoom());
-    onView(map.getBounds());
+    // The container can still be settling its size on first paint; re-measure, then fit
+    // the whole state so nothing (e.g. Mysuru in the south) starts cropped.
+    const id = window.setTimeout(() => {
+      map.invalidateSize();
+      if (!useFilters.getState().territory.length && !useFilters.getState().city.length && !useFilters.getState().pin.length) {
+        map.fitBounds(KARNATAKA, { padding: [16, 16] });
+      }
+      onZoom(map.getZoom());
+      onView(map.getBounds());
+    }, 60);
+    return () => window.clearTimeout(id);
   }, [map, onReady, onZoom, onView]);
 
   // Fly to the focused territory / city whenever the global filter changes
@@ -102,7 +119,7 @@ function Controller({ model, onZoom, onView, onReady, rightPad }: {
     const down = (e: L.LeafletMouseEvent) => {
       start.current = e.latlng;
       rect.current?.remove();
-      rect.current = L.rectangle(L.latLngBounds(e.latlng, e.latlng), { color: 'hsl(292 76% 42%)', weight: 1.5, dashArray: '4 4', fillOpacity: 0.08 }).addTo(map);
+      rect.current = L.rectangle(L.latLngBounds(e.latlng, e.latlng), { color: tokenColor('brand'), weight: 1.5, dashArray: '4 4', fillOpacity: 0.08 }).addTo(map);
     };
     const move = (e: L.LeafletMouseEvent) => {
       if (start.current && rect.current) rect.current.setBounds(L.latLngBounds(start.current, e.latlng));
@@ -184,22 +201,31 @@ export function MapCanvas({ model, onReady, onView, rightPad }: {
         maxZoom={16}
       />
       <ZoomControl position="bottomright" />
+      {/* Karnataka: soft mask outside the state + crisp boundary */}
+      <Polygon
+        positions={[WORLD, ...KARNATAKA_OUTLINE]}
+        interactive={false}
+        pathOptions={{ stroke: false, fillColor: c('bg'), fillOpacity: 0.55 }}
+      />
+      <Polyline positions={KARNATAKA_OUTLINE} interactive={false} pathOptions={{ color: c('brand', 0.55), weight: 1.5, dashArray: stateLevel ? undefined : '4 4' }} />
       <Controller model={model} onZoom={setZoom} onView={onView} onReady={onReady} rightPad={rightPad} />
 
       {stateLevel ? (
         model.cities.map((city) => {
           const color = city.topPriority ? c(PRIORITY_META[city.topPriority].token) : c('subtle');
-          const size = Math.round(30 + city.slots * 6);
+          const size = Math.round(28 + city.slots * 3);
           const open = city.slots - city.filled;
-          const html = `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;transform:translate(-50%,-50%);width:max-content">
-              <div style="width:${size}px;height:${size}px;border-radius:999px;background:${city.slots ? color : c('pin-outside')};opacity:.92;box-shadow:0 0 0 4px ${c('surface', 0.85)},0 6px 16px -6px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;color:${city.topPriority === 'Low' ? c('fg') : '#fff'};font:700 13px Inter,sans-serif;font-variant-numeric:tabular-nums">${city.slots ? `${open}` : '–'}</div>
-              <div style="font:600 11px Inter,sans-serif;color:${c('fg')};text-shadow:0 0 3px ${c('surface')},0 0 3px ${c('surface')};text-align:center">${city.city}<div style="font-weight:500;font-size:10px;color:${c('muted')}">${city.slots ? `${open} of ${city.slots} slots open` : 'no territory'}</div></div>
+          // The bubble itself is the icon box, anchored at its centre on the true city point;
+          // the name label hangs below it without shifting the anchor.
+          const html = `<div style="position:relative;width:${size}px;height:${size}px">
+              <div style="width:100%;height:100%;border-radius:999px;background:${city.slots ? color : c('pin-outside')};box-shadow:0 0 0 3px ${c('surface')},0 4px 14px -6px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;color:${city.topPriority === 'Low' ? c('fg') : '#fff'};font:700 13px Inter,sans-serif;font-variant-numeric:tabular-nums">${city.slots ? `${open}` : '–'}</div>
+              <div style="position:absolute;top:calc(100% + 5px);left:50%;transform:translateX(-50%);white-space:nowrap;text-align:center;font:600 11px Inter,sans-serif;color:${c('fg')};text-shadow:0 0 3px ${c('surface')},0 0 3px ${c('surface')}">${city.city}</div>
             </div>`;
           return (
             <Marker
               key={city.city}
               position={[city.lat, city.lng]}
-              icon={L.divIcon({ className: 'fcc-div-icon', html, iconSize: [0, 0] })}
+              icon={L.divIcon({ className: 'fcc-div-icon', html, iconSize: [size, size], iconAnchor: [size / 2, size / 2] })}
               eventHandlers={{ click: () => f.only('city', city.city) }}
               keyboard
               title={`${city.city}: ${open} open of ${city.slots} slots, ${city.stores} stores`}
@@ -216,19 +242,14 @@ export function MapCanvas({ model, onReady, onView, rightPad }: {
           {cells.map((cell) => {
             const p = model.byPin.get(cell.pin);
             if (!p) return null;
-            const t = cell.territoryId ? model.territories.find((x) => x.id === cell.territoryId) : undefined;
-            const showStates = !t || selTerritory === t.id || pxRadius(cell) >= 26 || !!selPin;
+            // Tiles sit at their real locations, so each always shows its own PIN state.
             const meta = PIN_META[p.status];
             let fill = c(meta.token);
-            let opacity = 0.62;
+            let opacity = 0.72;
             if (p.status === 'outside') opacity = 0.45;
             if (p.status === 'full') {
               fill = c('subtle');
               opacity = 0.22;
-            }
-            if (!showStates && t) {
-              fill = c(PRIORITY_META[t.priority].token);
-              opacity = 0.28;
             }
             if (!matchesFilters(p)) opacity *= 0.35;
             const selected = selPin === p.pin || areaSet.has(p.pin);
@@ -243,10 +264,7 @@ export function MapCanvas({ model, onReady, onView, rightPad }: {
                   weight: selected ? 3 : 1.5,
                 }}
                 eventHandlers={{
-                  click: () => {
-                    if (t && !showStates) f.only('territory', t.id);
-                    else f.only('pin', p.pin);
-                  },
+                  click: () => f.only('pin', p.pin),
                 }}
               >
                 <Tooltip className="fcc-tip" sticky direction="top" offset={[0, -8]}>

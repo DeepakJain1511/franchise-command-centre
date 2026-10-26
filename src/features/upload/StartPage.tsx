@@ -35,7 +35,7 @@ export default function StartPage() {
   const loaded = useData((s) => s.loaded);
 
   useEffect(() => {
-    document.title = 'Start · Expansion Command Centre';
+    document.title = 'Start · Bunty Consulting';
   }, []);
 
   const tick = (ms: number) => new Promise((r) => setTimeout(r, reduced ? 0 : ms));
@@ -91,7 +91,7 @@ export default function StartPage() {
         <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-brand text-brand-fg shadow-soft">
           <Hexagon className="h-4 w-4" strokeWidth={2.5} />
         </span>
-        <span className="text-sm font-semibold tracking-tight">Expansion Command Centre</span>
+        <span className="text-sm font-semibold tracking-tight">Bunty Consulting</span>
         <div className="ml-auto flex items-center gap-1">
           {loaded && phase === 'idle' && (
             <Button variant="ghost" size="sm" onClick={() => navigate('/overview')}>

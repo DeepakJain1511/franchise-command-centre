@@ -27,8 +27,8 @@ function Brand({ collapsed }: { collapsed?: boolean }) {
       </span>
       {!collapsed && (
         <span className="leading-tight">
-          <span className="block text-sm font-semibold tracking-tight">Expansion</span>
-          <span className="block text-2xs text-subtle">Command Centre</span>
+          <span className="block text-sm font-semibold tracking-tight">Bunty Consulting</span>
+          <span className="block text-2xs text-subtle">Franchise expansion</span>
         </span>
       )}
     </Link>
@@ -200,7 +200,7 @@ export function AppShell() {
   }, [loaded]);
 
   useEffect(() => {
-    document.title = current ? `${current.label} · Expansion Command Centre` : 'Expansion Command Centre';
+    document.title = current ? `${current.label} · Bunty Consulting` : 'Bunty Consulting';
   }, [current]);
 
   return (

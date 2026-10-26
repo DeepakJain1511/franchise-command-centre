@@ -2,10 +2,8 @@
  * Hex-lattice layout for PIN codes (presentation only).
  *
  * We have no real PIN boundary polygons, so each PIN's approximate centroid is snapped
- * onto a pointy-top hex lattice per city. Territory PINs are packed around the territory's
- * anchor so every territory reads as one contiguous honeycomb; PINs outside territories
- * snap to the nearest free cell. Outlines are the hex edges not shared with a neighbour
- * of the same territory.
+ * onto a pointy-top hex lattice per city, at the free cell nearest its real location.
+ * Territory outlines are the hex edges not shared with a neighbour of the same territory.
  */
 import { haversineKm } from './geo';
 
@@ -40,10 +38,10 @@ export interface HexLayout {
 }
 
 const HEX_KM: Record<string, number> = {
-  Bengaluru: 1.45,
-  'Hubballi-Dharwad': 1.1,
+  Bengaluru: 1.0,
+  'Hubballi-Dharwad': 0.8,
 };
-const DEFAULT_KM = 0.75;
+const DEFAULT_KM = 0.55;
 
 /** Pointy-top: neighbour across edge i (edge between corner i and i+1). */
 const EDGE_NEIGHBOUR: Array<[number, number]> = [
@@ -118,41 +116,9 @@ export function layoutHexes(inputs: HexInput[]): HexLayout {
       });
     };
 
-    // 1. territories: pack each one around its anchor
-    const terrIds = [...new Set(list.map((i) => i.territoryId).filter((t): t is string => !!t))].sort();
-    for (const tid of terrIds) {
-      const members = list.filter((i) => i.territoryId === tid);
-      const ax = members.reduce((s, i) => s + toKm(f, i.lat, i.lng).x, 0) / members.length;
-      const ay = members.reduce((s, i) => s + toKm(f, i.lat, i.lng).y, 0) / members.length;
-      const [aq, ar] = toAxial(f, ax, ay);
-      const candidates: Array<[number, number]> = [];
-      for (const [q, r] of spiral(aq, ar)) {
-        if (!taken.has(`${q},${r}`)) candidates.push([q, r]);
-        if (candidates.length >= members.length) break;
-      }
-      const sorted = [...members].sort((a, b) => {
-        const da = toKm(f, a.lat, a.lng);
-        const db = toKm(f, b.lat, b.lng);
-        return Math.hypot(da.x - ax, da.y - ay) - Math.hypot(db.x - ax, db.y - ay);
-      });
-      for (const m of sorted) {
-        const pos = toKm(f, m.lat, m.lng);
-        let best = 0;
-        let bestD = Infinity;
-        candidates.forEach(([q, r], idx) => {
-          const c = centreKm(f, q, r);
-          const d = Math.hypot(c.x - pos.x, c.y - pos.y);
-          if (d < bestD) {
-            bestD = d;
-            best = idx;
-          }
-        });
-        const [q, r] = candidates.splice(best, 1)[0];
-        place(m, q, r);
-      }
-    }
-    // 2. everything else: nearest free cell
-    for (const m of list.filter((i) => !i.territoryId)) {
+    // Every PIN goes to the free cell nearest its real location, so tiles stay where the
+    // locality actually is (at most ~one tile away when two PINs are very close).
+    for (const m of [...list].sort((a, b) => a.pin.localeCompare(b.pin))) {
       const pos = toKm(f, m.lat, m.lng);
       const [q0, r0] = toAxial(f, pos.x, pos.y);
       for (const [q, r] of spiral(q0, r0)) {

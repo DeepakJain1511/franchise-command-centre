@@ -104,8 +104,8 @@ export function useMapModel(): { model: MapModel | null; loading: boolean; error
       const territories = ds.data!.territories.filter((t) => t.city === city);
       return {
         city,
-        lat: a.lat / a.n,
-        lng: a.lng / a.n,
+        lat: ds.data!.cities.find((x) => x.city === city)?.lat ?? a.lat / a.n,
+        lng: ds.data!.cities.find((x) => x.city === city)?.lng ?? a.lng / a.n,
         stores: a.stores,
         territories,
         slots: territories.reduce((n, t) => n + t.openSlots, 0),

@@ -13,7 +13,7 @@ import { pct } from '@/lib/format';
 import { useFilters, type ListKey } from '@/store/filters';
 
 const STEPS: Array<{ stage: Stage; label: string; bar: string }> = [
-  { stage: 'Applied', label: 'Applied', bar: 'bg-fg/70' },
+  { stage: 'Applied', label: 'Applied', bar: 'bg-subtle/70' },
   { stage: 'Screened', label: 'Screened', bar: 'bg-st-waitlisted' },
   { stage: 'Approved', label: 'Approved', bar: 'bg-st-approved' },
   { stage: 'In onboarding', label: 'In onboarding', bar: 'bg-st-onboarding' },

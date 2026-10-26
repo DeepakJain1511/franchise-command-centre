@@ -25,7 +25,7 @@ export const STAGE_META: Record<Stage, { token: string; icon: LucideIcon; cls: s
 export const PRIORITY_META: Record<Priority, { token: string; bars: number; cls: string }> = {
   High: { token: 'pr-high', bars: 3, cls: 'text-pr-high bg-pr-high/10 border-pr-high/25' },
   Medium: { token: 'pr-medium', bars: 2, cls: 'text-pr-medium bg-pr-medium/10 border-pr-medium/25' },
-  Low: { token: 'pr-low', bars: 1, cls: 'text-pr-low bg-pr-low/15 border-pr-low/30' },
+  Low: { token: 'pr-low', bars: 1, cls: 'text-muted bg-pr-low/15 border-pr-low/40' },
 };
 
 export const PIN_META: Record<PinStatus, { token: string; label: string; icon: LucideIcon; cls: string }> = {

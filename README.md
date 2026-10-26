@@ -1,4 +1,4 @@
-# Franchise Expansion Command Centre — Phase 1 (UI/UX)
+# Bunty Consulting — Franchise Expansion (Phase 1 UI/UX)
 
 The front end of a tool that takes a franchise partner from **application → approved → onboarded → open store**,
 built for the "AI x Ops" hackathon (Case 1: Franchise Partner Acquisition, Geo-Selection & Onboarding).
@@ -90,10 +90,16 @@ share a PIN with an existing store — including after every canned what-if is a
 ## Design notes
 
 - **3-level disclosure:** glance (numbers, colour) → click (cross-filter, compact panel) → drawer/detail.
-- **One semantic palette:** Approved green · On hold amber · Rejected rose · Waitlisted blue-grey ·
-  In onboarding indigo · Open teal · Needs info violet. Priority is a separate magenta scale with bar
-  glyphs. Colour is always paired with an icon or label. Avatars are neutral so colour only means something.
-- Light and dark themes, Inter with tabular numbers, 150–250 ms motion, `prefers-reduced-motion` respected.
+- **Soft, warm palette:** ivory background, steel-blue accent, muted semantic colours — Approved green ·
+  On hold amber · Rejected rose · Waitlisted blue-grey · In onboarding indigo · Open teal · Needs info
+  violet. Priority is a steel-blue scale with bar glyphs. Colour is always paired with an icon or label;
+  avatars are neutral so colour only means something.
+- Light by default (dark only if picked in the top bar or Settings); dark is a calm slate, not black.
+  Inter with tabular numbers, 150–250 ms motion, `prefers-reduced-motion` respected.
+- **Map geography:** the Karnataka boundary is a simplified outline from the geohacker/india (GADM-derived)
+  state boundaries (`src/data/geo/karnataka.ts`, regenerate with `scripts/extract-karnataka.mjs`).
+  City markers sit on true city centres. PIN tiles are drawn at their locality's approximate centre
+  (checked against public PIN directories) — a test keeps every tile within ~2 tile widths of it.
 - Basemap: Esri Light/Dark Gray Canvas (no key). CARTO tiles, named in the brief, now return an
   "API key required" watermark.
 
