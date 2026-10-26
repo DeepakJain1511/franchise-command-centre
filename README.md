@@ -4,7 +4,8 @@ The front end of a tool that takes a franchise partner from **application → ap
 built for the "AI x Ops" hackathon (Case 1: Franchise Partner Acquisition, Geo-Selection & Onboarding).
 
 > **Phase 1 is UI only.** Every decision comes from hand-written fixtures behind a swappable
-> `DecisionEngine`. There is no backend, no login and no secrets. See [PHASE2_TODO.md](PHASE2_TODO.md).
+> `DecisionEngine`. There is no backend, no login and no secrets. See [PHASE2_TODO.md](PHASE2_TODO.md),
+> and [API.md](API.md) for the backend endpoints and request/response shapes.
 
 ## Run it
 
