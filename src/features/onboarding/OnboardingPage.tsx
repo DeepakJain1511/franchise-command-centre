@@ -1,19 +1,21 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { CalendarCheck, Clock3, GanttChartSquare, GraduationCap, TriangleAlert, Users } from 'lucide-react';
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/app/AppShell';
 import { Avatar, LanguageBadge } from '@/components/chips';
 import { EmptyState, ErrorState, Skeleton, Stat } from '@/components/data';
 import { Segmented, Select } from '@/components/ui/controls';
 import { Tooltip } from '@/components/ui/overlay';
 import { useFilteredApplicants } from '@/engine/hooks';
-import type { OnboardingPlan } from '@/engine/types';
+import { ONBOARDING_STEPS, type OnboardingPlan, type OnboardingStep } from '@/engine/types';
 import { useView } from '@/lib/hooks';
 import type { ApplicantRow } from '@/lib/filtering';
 import { useAppDrawer, useColors } from '@/lib/hooks';
 import { DEMO_TODAY, fmtDate, iso } from '@/lib/time';
 import { useData } from '@/store/data';
 import { useFilters } from '@/store/filters';
+import { CityStrip, StageJourney } from './StageJourney';
 import { isStepOverdue, OnboardingStepper, Ring } from './Stepper';
 import { trainingFor } from './training';
 
@@ -40,6 +42,26 @@ function RiskChip({ note }: { note: string }) {
 
 /* ---------------- Partners ---------------- */
 function Partners({ rows }: { rows: Row[] }) {
+  const cities = [...new Set(rows.map((r) => r.app.city))].sort((a, b) => rows.filter((r) => r.app.city === b).length - rows.filter((r) => r.app.city === a).length);
+  return (
+    <div className="space-y-5">
+      {cities.map((city) => {
+        const list = rows.filter((r) => r.app.city === city);
+        return (
+          <section key={city} aria-label={city}>
+            <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+              {city}
+              <span className="rounded-full bg-raised px-1.5 text-2xs font-medium text-muted tnum">{list.length}</span>
+            </h2>
+            <PartnerCards rows={list} />
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function PartnerCards({ rows }: { rows: Row[] }) {
   const { openApp } = useAppDrawer();
   return (
     <ul className="grid gap-3 lg:grid-cols-2">
@@ -245,10 +267,26 @@ export default function OnboardingPage() {
   const reset = useFilters((s) => s.reset);
   const bump = useData((s) => s.bump);
   const [view, setView] = useView<View>(VIEWS, 'partners');
+  const [params, setParams] = useSearchParams();
+  const rawStep = params.get('step');
+  const step = (ONBOARDING_STEPS as readonly string[]).includes(rawStep ?? '') ? (rawStep as OnboardingStep) : null;
+  const setStep = (s: OnboardingStep | null) =>
+    setParams(
+      (p) => {
+        const n = new URLSearchParams(p);
+        if (s) n.set('step', s);
+        else n.delete('step');
+        return n;
+      },
+      { replace: true },
+    );
+  const cityQ = useFilteredApplicants(['city']);
   const rows = (q.data ?? [])
     .filter((r): r is Row => r.decision.onboarding !== null)
     .sort((a, b) => a.decision.onboarding.startDate.localeCompare(b.decision.onboarding.startDate));
   const atRisk = rows.filter((r) => riskOf(r.decision.onboarding)).length;
+  const shown = step ? rows.filter((r) => r.decision.onboarding.current === step) : rows;
+  const stripRows = (cityQ.data ?? []).filter((r): r is Row => r.decision.onboarding !== null && (!step || r.decision.onboarding.current === step));
 
   return (
     <div className="pb-10">
@@ -286,7 +324,17 @@ export default function OnboardingPage() {
               <Stat label="Opened" value={rows.filter((r) => r.decision.onboarding.current === 'Open').length} tone="text-st-open" />
               <Stat label="At risk" value={atRisk} tone={atRisk ? 'text-st-hold' : undefined} />
             </div>
-            {view === 'partners' ? <Partners rows={rows} /> : view === 'training' ? <Training rows={rows} /> : <Cohort rows={rows} />}
+            <StageJourney rows={rows} step={step} onPick={setStep} riskOf={(r) => riskOf(r.decision.onboarding)} />
+            <CityStrip rows={stripRows} />
+            {shown.length === 0 ? (
+              <EmptyState title={`Nobody at ${step ?? 'this stage'} in this view`} onReset={() => setStep(null)} icon={<GanttChartSquare className="h-5 w-5" />} />
+            ) : view === 'partners' ? (
+              <Partners rows={shown} />
+            ) : view === 'training' ? (
+              <Training rows={shown} />
+            ) : (
+              <Cohort rows={shown} />
+            )}
           </>
         )}
       </div>
