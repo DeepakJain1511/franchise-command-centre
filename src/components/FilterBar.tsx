@@ -1,6 +1,6 @@
 import { ChevronDown, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { CITIES, DECISION_STATUSES, type Language, type Priority } from '@/engine/types';
 import { useDataset } from '@/engine/hooks';
 import { cn } from '@/lib/cn';
@@ -18,19 +18,28 @@ const LABEL: Record<ListKey, string> = {
 /** Keeps the global filters and the URL query string in sync (shareable views). */
 export function FilterUrlSync() {
   const [params, setParams] = useSearchParams();
+  const { pathname } = useLocation();
   const filters = useFilters();
   const replaceAll = useFilters((s) => s.replaceAll);
   const lastWritten = useRef<string | null>(null);
+  const lastPath = useRef<string | null>(null);
 
-  // URL -> store (on load + back/forward)
+  // URL -> store (on load, deep links, back/forward). Moving to another screen via a plain
+  // link (no filter params) keeps the current filters instead of clearing them.
   useEffect(() => {
     const fromUrl = paramsToFilters(params);
     const key = JSON.stringify(fromUrl);
+    const navigatedWithoutFilters = lastPath.current !== null && lastPath.current !== pathname && activeFilterCount(fromUrl) === 0;
+    lastPath.current = pathname;
+    if (navigatedWithoutFilters) {
+      lastWritten.current = null; // force store -> URL below
+      return;
+    }
     if (key !== lastWritten.current) {
       lastWritten.current = key;
       replaceAll(fromUrl);
     }
-  }, [params, replaceAll]);
+  }, [params, pathname, replaceAll]);
 
   // store -> URL
   const current: Filters = {
@@ -42,7 +51,7 @@ export function FilterUrlSync() {
     if (key === lastWritten.current) return;
     lastWritten.current = key;
     setParams((p) => filtersToParams(JSON.parse(key) as Filters, p), { replace: true });
-  }, [key, setParams]);
+  }, [key, setParams, pathname]);
 
   return null;
 }

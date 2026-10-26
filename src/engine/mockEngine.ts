@@ -176,6 +176,7 @@ class MockEngine implements DecisionEngine {
         territoryId: this.territoryOf(app.pin)?.id ?? null,
         attention: fx.attention ?? (plan?.atRisk ? 'Onboarding at risk' : null),
         attentionPriority: fx.attention ? (fx.attentionOrder ?? 50) : plan?.atRisk ? 50 : null,
+        dropReason: fx.dropReason ?? null,
         nextSteps: buildNextSteps(app.id, fx, plan),
         onboarding: plan,
         dataFlags: [...dataFlagsFor(app, this.territories, this.stores), ...(fx.extraFlags ?? [])],

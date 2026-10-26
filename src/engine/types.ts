@@ -187,6 +187,8 @@ export const Decision = z.object({
   attention: z.string().nullable(),
   /** Lower = more urgent. Null when no attention is needed. */
   attentionPriority: z.number().nullable(),
+  /** Short bucket for "why people drop at this stage" (funnel drill-in). */
+  dropReason: z.string().nullable(),
   nextSteps: z.array(NextStep),
   onboarding: OnboardingPlan.nullable(),
   dataFlags: z.array(DataFlag),

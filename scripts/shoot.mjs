@@ -10,7 +10,7 @@ const themes = (process.argv[4] ?? 'light').split(',');
 const full = process.env.FULL === '1';
 fs.mkdirSync('screenshots', { recursive: true });
 
-const browser = await chromium.launch(process.env.CHANNEL ? { channel: process.env.CHANNEL } : {});
+const browser = await chromium.launch({ channel: process.env.CHANNEL ?? 'msedge' });
 for (const theme of themes) {
   for (const w of widths) {
     const ctx = await browser.newContext({ viewport: { width: w, height: w < 600 ? 844 : 900 }, deviceScaleFactor: 1, colorScheme: theme });
