@@ -300,6 +300,32 @@ export interface ScenarioResult {
 }
 
 /* ------------------------------------------------------------------ */
+/* Partner portal                                                     */
+/* ------------------------------------------------------------------ */
+
+export interface ChatMessage {
+  id: string;
+  from: 'partner' | 'brand';
+  text: string;
+  at: string; // ISO date-time
+}
+
+export interface PartnerProfile {
+  applicationId: string;
+  manager: { name: string; role: string; phone: string; email: string; hours: string; languages: string[] };
+  /** Illustrative store economics (₹ lakh / month) — an estimate, not a forecast. */
+  economics: {
+    investmentLakh: number;
+    monthlySalesLakh: number;
+    grossMargin: number;
+    monthlyCostsLakh: number;
+    paybackMonths: number;
+    basis: string; // e.g. "similar Tier 1 stores"
+  };
+  messages: ChatMessage[];
+}
+
+/* ------------------------------------------------------------------ */
 /* The seam                                                           */
 /* ------------------------------------------------------------------ */
 
@@ -317,5 +343,9 @@ export interface DecisionEngine {
   revertScenario(scenarioId: string): Promise<void>;
   getTerritoryState(): Promise<TerritoryState[]>;
   getPinStates(): Promise<PinState[]>;
+  /** Partner portal: assigned manager, payback estimate and the message thread. */
+  getPartnerProfile(applicationId: string): Promise<PartnerProfile>;
+  /** Partner sends a message; resolves with the brand's reply. */
+  sendPartnerMessage(applicationId: string, text: string): Promise<ChatMessage>;
   reset(): Promise<void>;
 }

@@ -7,6 +7,7 @@
 import { applications as appFixtures } from '@/data/mock/applications';
 import { decisionFixtures, STEP_OFFSETS, STEP_OWNER, TRAINING_MODULES, type DecisionFixture, type ReasonTuple } from '@/data/mock/decisions';
 import { cityCentres, pincodes } from '@/data/mock/pincodes';
+import { cannedReplies, defaultReply, economicsByTier, managersByCity, managersByTerritory } from '@/data/mock/partner';
 import { cannedScenarios } from '@/data/mock/scenarios';
 import { stores as storeFixtures } from '@/data/mock/stores';
 import { territories as territoryFixtures } from '@/data/mock/territories';
@@ -16,12 +17,14 @@ import {
   ONBOARDING_STEPS,
   type Application,
   type AskResponse,
+  type ChatMessage,
   type Dataset,
   type Decision,
   type DecisionEngine,
   type Explanation,
   type NextStep,
   type OnboardingPlan,
+  type PartnerProfile,
   type PinState,
   type Reason,
   type ScenarioChange,
@@ -415,6 +418,67 @@ class MockEngine implements DecisionEngine {
     };
   }
 
+  /* -------------------------- Partner portal -------------------------- */
+
+  private threads = new Map<string, ChatMessage[]>();
+
+  async getPartnerProfile(applicationId: string): Promise<PartnerProfile> {
+    await delay(120);
+    const app = this.applications.find((a) => a.id === applicationId);
+    if (!app) throw new Error(`Unknown application ${applicationId}`);
+    const fx = this.fixtures[applicationId];
+    const territory = this.territoryOf(app.pin);
+    const manager = (territory && managersByTerritory[territory.id]) || managersByCity[app.city];
+    const tier = territory?.tier ?? (app.city === 'Bengaluru' ? 'Tier 1' : app.city === 'Tumakuru' || app.city === 'Davanagere' ? 'Tier 3' : 'Tier 2');
+    // PHASE-2: real logic goes here — payback from the real P&L model.
+    const e = economicsByTier[tier];
+    const profit = e.monthlySalesLakh * e.grossMargin - e.monthlyCostsLakh;
+    if (!this.threads.has(applicationId)) {
+      const first = app.name.split(' ')[0];
+      const plan = buildOnboarding(fx);
+      const t0 = `${iso(DEMO_TODAY)}T09:15:00`;
+      this.threads.set(applicationId, [
+        { id: 'm1', from: 'brand', at: `${plan?.startDate ?? app.submittedAt}T10:00:00`, text: `Hi ${first}, I'm ${manager.name}, your relationship manager at Bunty. I'll be with you all the way to opening day.` },
+        {
+          id: 'm2',
+          from: 'brand',
+          at: t0,
+          text: plan
+            ? plan.current === 'Open'
+              ? 'Congratulations on opening! Your 30-day review is on the calendar; ping me with anything.'
+              : `You're at the ${plan.current} stage. Target opening is ${plan.targetOpen.split('-').reverse().slice(0, 2).join('/')}. Tell me if anything is blocking you.`
+            : `Thanks for applying. ${fx.summary} Reply here if you have questions.`,
+        },
+      ]);
+    }
+    return {
+      applicationId,
+      manager,
+      economics: {
+        investmentLakh: app.investmentLakh,
+        monthlySalesLakh: e.monthlySalesLakh,
+        grossMargin: e.grossMargin,
+        monthlyCostsLakh: e.monthlyCostsLakh,
+        paybackMonths: profit > 0 ? Math.ceil(app.investmentLakh / profit) : Infinity,
+        basis: `similar ${tier} stores`,
+      },
+      messages: clone(this.threads.get(applicationId)!),
+    };
+  }
+
+  async sendPartnerMessage(applicationId: string, text: string): Promise<ChatMessage> {
+    const thread = this.threads.get(applicationId) ?? [];
+    const now = new Date().toISOString();
+    thread.push({ id: `p${thread.length + 1}`, from: 'partner', text, at: now });
+    await delay(900);
+    // PHASE-2: real logic goes here — real messaging between partner and brand.
+    const reply = cannedReplies.find((r) => r.keys.test(text))?.reply ?? defaultReply;
+    const msg: ChatMessage = { id: `b${thread.length + 1}`, from: 'brand', text: reply, at: new Date().toISOString() };
+    thread.push(msg);
+    this.threads.set(applicationId, thread);
+    return msg;
+  }
+
   async getScenarioPresets(): Promise<ScenarioPreset[]> {
     await delay(80);
     return cannedScenarios.map((s) => ({ applicationId: s.applicationId, title: s.title, change: { applicationId: s.applicationId, ...s.preset } }));
@@ -468,6 +532,7 @@ class MockEngine implements DecisionEngine {
     this.stores = clone(storeFixtures);
     this.fixtures = clone(decisionFixtures);
     this.applied.clear();
+    this.threads.clear();
     this.source = 'sample';
     this.fileName = undefined;
   }

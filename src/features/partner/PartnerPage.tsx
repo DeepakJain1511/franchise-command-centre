@@ -1,8 +1,8 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { motion } from 'framer-motion';
 import {
-  ArrowLeft, CalendarDays, Check, CheckCircle2, ChevronRight, Circle, Clock3, GraduationCap, Hexagon, LifeBuoy, ListChecks, MapPin, MessageCircle, Moon,
-  PhoneCall, PlayCircle, Store, Sun, TriangleAlert,
+  ArrowLeft, CalendarDays, Check, CheckCircle2, ChevronRight, Circle, Clock3, GraduationCap, Hexagon, ListChecks, MapPin, Moon,
+  PlayCircle, Store, Sun, TriangleAlert,
 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -20,6 +20,8 @@ import { DEMO_TODAY, fmtDate, fmtDateLong, iso } from '@/lib/time';
 import { useData } from '@/store/data';
 import { useUi } from '@/store/ui';
 import { loadDataset } from '@/lib/actions';
+import { usePartnerProfile } from '@/engine/hooks';
+import { ChatCard, ExtrasSkeleton, ManagerCard, PaybackCard } from './PartnerExtras';
 
 /** What each stage means, in the partner's words. */
 const STAGE_COPY: Record<OnboardingStep, { what: string; you: string }> = {
@@ -199,6 +201,7 @@ function BigRing({ value, label, sub }: { value: number; label: ReactNode; sub: 
 function OnboardingPortal({ row, plan }: { row: ApplicantRow; plan: OnboardingPlan }) {
   const { app } = row;
   const pins = usePinStates();
+  const profile = usePartnerProfile(app.id);
   const pin = pins.data?.find((p) => p.pin === app.pin);
   const doneSteps = plan.steps.filter((s) => s.state === 'done').length;
   const progress = plan.current === 'Open' ? 1 : doneSteps / ONBOARDING_STEPS.length;
@@ -256,12 +259,19 @@ function OnboardingPortal({ row, plan }: { row: ApplicantRow; plan: OnboardingPl
         <Reveal delay={0.16}>
           <div className="space-y-5">
             <StoreCard row={row} area={pin?.area} />
-            <Help />
+            {profile.data ? <ManagerCard profile={profile.data} /> : <ExtrasSkeleton />}
           </div>
         </Reveal>
       </div>
 
-      <Reveal delay={0.2}>
+      <Reveal delay={0.18}>
+        <div className="grid gap-5 lg:grid-cols-2">
+          {profile.data ? <PaybackCard profile={profile.data} /> : <ExtrasSkeleton />}
+          {profile.data ? <ChatCard profile={profile.data} /> : <ExtrasSkeleton />}
+        </div>
+      </Reveal>
+
+      <Reveal delay={0.22}>
         <TrainingSection row={row} plan={plan} />
       </Reveal>
     </div>
@@ -413,23 +423,6 @@ function StoreCard({ row, area }: { row: ApplicantRow; area?: string }) {
   );
 }
 
-function Help() {
-  const toast = useUi((s) => s.toast);
-  return (
-    <Section title="Need help?" icon={<LifeBuoy />}>
-      <p className="text-sm text-muted">Your expansion manager replies within a working day.</p>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <Button onClick={() => toast('Messaging opens in the full version')}>
-          <MessageCircle /> Message
-        </Button>
-        <Button onClick={() => toast('Call booking opens in the full version')}>
-          <PhoneCall /> Book a call
-        </Button>
-      </div>
-    </Section>
-  );
-}
-
 function TrainingSection({ row, plan }: { row: ApplicantRow; plan: OnboardingPlan }) {
   const toast = useUi((s) => s.toast);
   const modules = plan.training;
@@ -496,6 +489,7 @@ function TrainingSection({ row, plan }: { row: ApplicantRow; plan: OnboardingPla
 /** Not approved yet: show the application status and what would move it forward. */
 function ApplicationPortal({ row }: { row: ApplicantRow }) {
   const { app, decision } = row;
+  const profile = usePartnerProfile(app.id);
   const firstName = app.name.split(' ')[0];
   const blockers = decision.reasons.filter((r) => r.sentiment !== 'helped');
   const strengths = decision.reasons.filter((r) => r.sentiment === 'helped');
@@ -555,8 +549,14 @@ function ApplicationPortal({ row }: { row: ApplicantRow }) {
         </Reveal>
       </div>
       <Reveal delay={0.14}>
-        <Help />
+        <div className="grid gap-5 lg:grid-cols-[1fr_1.3fr]">
+          {profile.data ? <ManagerCard profile={profile.data} /> : <ExtrasSkeleton />}
+          {profile.data ? <ChatCard profile={profile.data} /> : <ExtrasSkeleton />}
+        </div>
       </Reveal>
+      {decision.status !== 'Rejected' && (
+        <Reveal delay={0.18}>{profile.data ? <PaybackCard profile={profile.data} /> : <ExtrasSkeleton />}</Reveal>
+      )}
     </div>
   );
 }

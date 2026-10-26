@@ -7,7 +7,7 @@ import { useData } from '@/store/data';
 import { useFilters } from '@/store/filters';
 import { applyFilters, type ApplicantRow } from '@/lib/filtering';
 import { engine } from './index';
-import type { Dataset, Decision, Explanation, PinState, ScenarioChange, ScenarioPreset, ScenarioResult, TerritoryState } from './types';
+import type { Dataset, Decision, Explanation, PartnerProfile, PinState, ScenarioChange, ScenarioPreset, ScenarioResult, TerritoryState } from './types';
 
 const cache = new Map<string, Promise<unknown>>();
 
@@ -51,6 +51,8 @@ export const useExplanation = (id: string | null) =>
   useEngineQuery<Explanation>(`explain:${id}`, () => engine.explain(id!), !!id);
 
 export const useScenarioPresets = () => useEngineQuery<ScenarioPreset[]>('presets', () => engine.getScenarioPresets());
+export const usePartnerProfile = (id: string | null) =>
+  useEngineQuery<PartnerProfile>(`partner:${id}`, () => engine.getPartnerProfile(id!), !!id);
 
 /* ---------------- Actions (ask / simulate / apply / revert) ---------------- */
 
@@ -74,6 +76,7 @@ function useAction<A extends unknown[], R>(fn: (...args: A) => Promise<R>) {
 
 export const useAsk = () => useAction((q: string) => engine.ask(q));
 export const useSimulate = () => useAction((c: ScenarioChange) => engine.simulate(c));
+export const useSendPartnerMessage = () => useAction((id: string, text: string) => engine.sendPartnerMessage(id, text));
 
 /** Commit / undo a simulated scenario; every screen refetches afterwards. */
 export function useScenarioCommit() {
