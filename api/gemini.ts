@@ -1,6 +1,6 @@
 /** Vercel serverless function: /api/gemini. Set OPENROUTER_API_KEY (and optionally OPENROUTER_MODEL) in the Vercel project. */
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { handleGemini } from '../server/gemini';
+import { handleGemini } from '../server/gemini.js';
 
 async function readBody(req: IncomingMessage & { body?: unknown }): Promise<string> {
   if (typeof req.body === 'string') return req.body;
