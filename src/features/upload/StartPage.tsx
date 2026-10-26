@@ -5,7 +5,9 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Avatar, FlagChip, PriorityChip, StatusChip } from '@/components/chips';
+import { CountUp, Reveal } from '@/components/data';
 import { Toaster } from '@/components/Toaster';
+import { Tooltip } from '@/components/ui/overlay';
 import { Button } from '@/components/ui/button';
 import { useApplicants, useDataset, useTerritoryStates } from '@/engine/hooks';
 import { loadDataset } from '@/lib/actions';
@@ -14,9 +16,10 @@ import { inrLakh } from '@/lib/format';
 import { useReducedMotion } from '@/lib/hooks';
 import { useData } from '@/store/data';
 import { useUi } from '@/store/ui';
-import { checkWorkbook, fileTypeError, type WorkbookCheck } from './checkWorkbook';
+import { checkWorkbook, EXPECTED, fileTypeError, type SheetName, type WorkbookCheck } from './checkWorkbook';
+import { ProcessingView, STAGES } from './ProcessingView';
+import { StartBackdrop } from './StartBackdrop';
 
-const STAGES = ['Reading sheets', 'Checking data', 'Matching PINs to territories', 'Deciding', 'Preparing onboarding'];
 type Phase = 'idle' | 'processing' | 'done' | 'error';
 type Preview = 'apps' | 'territories' | 'flags' | 'competing' | null;
 
@@ -25,6 +28,7 @@ export default function StartPage() {
   const [stage, setStage] = useState(0);
   const [drag, setDrag] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [fileSize, setFileSize] = useState<number | null>(null);
   const [check, setCheck] = useState<WorkbookCheck | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -46,6 +50,7 @@ export default function StartPage() {
     setCheck(null);
     setStage(0);
     setFileName(source === 'sample' ? null : source.name);
+    setFileSize(source === 'sample' ? null : source.size);
     try {
       if (source !== 'sample') {
         const typeErr = fileTypeError(source);
@@ -66,7 +71,7 @@ export default function StartPage() {
       const loading = loadDataset(source);
       for (let i = 2; i < STAGES.length; i++) {
         setStage(i);
-        await tick(380);
+        await tick(520);
       }
       await loading;
       setStage(STAGES.length);
@@ -84,8 +89,7 @@ export default function StartPage() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-bg">
-      <div aria-hidden className="pointer-events-none absolute inset-0 [background:radial-gradient(60%_50%_at_50%_0%,hsl(var(--brand)/0.10),transparent_70%)]" />
-      <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.35] [background-image:linear-gradient(hsl(var(--border))_1px,transparent_1px),linear-gradient(90deg,hsl(var(--border))_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(70%_60%_at_50%_30%,black,transparent)]" />
+      <StartBackdrop />
 
       <header className="relative flex items-center gap-3 px-4 py-4 md:px-8">
         <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-brand text-brand-fg shadow-soft">
@@ -105,10 +109,14 @@ export default function StartPage() {
       </header>
 
       <main className="relative mx-auto flex max-w-2xl flex-col items-center px-4 pb-16 pt-6 text-center md:pt-12">
-        <h1 className="text-3xl font-semibold tracking-tight md:text-[40px] md:leading-[1.1]">
-          From applications to open stores.
-        </h1>
-        <p className="mt-3 text-base text-muted">Upload the Excel. See who to approve, where, and why.</p>
+        <Reveal>
+          <h1 className="text-balance text-3xl font-semibold tracking-tight md:-mx-24 md:text-[44px] md:leading-[1.08]">
+            From applications to <span className="text-brand">open stores.</span>
+          </h1>
+        </Reveal>
+        <Reveal delay={0.08}>
+          <p className="mt-3 text-base text-muted">Upload the Excel. See who to approve, where, and why.</p>
+        </Reveal>
 
         <AnimatePresence mode="wait">
           {(phase === 'idle' || phase === 'error') && (
@@ -127,21 +135,25 @@ export default function StartPage() {
                 }}
                 aria-label="Upload Excel file: drop it here or press Enter to browse"
                 className={cn(
-                  'card group flex cursor-pointer flex-col items-center gap-4 border-2 border-dashed px-6 py-10 transition-all focus-ring',
-                  drag ? 'scale-[1.01] border-brand bg-brand-soft' : 'hover:border-brand/50 hover:shadow-lift',
+                  'card group flex cursor-pointer flex-col items-center gap-4 border-2 border-dashed bg-surface/80 px-6 py-10 backdrop-blur-md transition-all duration-300 focus-ring',
+                  drag ? 'scale-[1.02] border-brand bg-brand-soft/90 shadow-pop' : 'hover:-translate-y-0.5 hover:border-brand/50 hover:shadow-lift',
                 )}
               >
-                <span className={cn('flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-soft text-brand transition-transform', drag && 'scale-110')}>
+                <motion.span
+                  animate={drag ? { scale: 1.15, y: -4 } : { scale: 1, y: [0, -4, 0] }}
+                  transition={drag ? { type: 'spring', stiffness: 300, damping: 15 } : { duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+                  className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-soft text-brand"
+                >
                   <Upload className="h-6 w-6" />
-                </span>
+                </motion.span>
                 <div>
-                  <p className="text-lg font-semibold">Drop your Excel here</p>
+                  <p className="text-lg font-semibold">{drag ? 'Release to upload' : 'Drop your Excel here'}</p>
                   <p className="text-sm text-muted">or click to browse · .xlsx</p>
                 </div>
                 <div className="flex flex-wrap justify-center gap-2" aria-label="Expected sheets">
-                  <SheetChip>Applications</SheetChip>
-                  <SheetChip>Territories</SheetChip>
-                  <SheetChip builtIn>Existing stores</SheetChip>
+                  <SheetChip name="Applications" />
+                  <SheetChip name="Territories" />
+                  <SheetChip name="Existing stores" builtIn />
                 </div>
                 <input ref={inputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => onFiles(e.target.files)} />
               </div>
@@ -163,7 +175,8 @@ export default function StartPage() {
               )}
 
               <div className="mt-6 flex flex-col items-center gap-3">
-                <Button variant="primary" size="lg" onClick={() => run('sample')} className="min-w-64 shadow-lift">
+                <Button variant="primary" size="lg" onClick={() => run('sample')} className="group relative min-w-64 overflow-hidden shadow-lift">
+                  <span aria-hidden className="pointer-events-none absolute inset-y-0 -left-1/2 w-1/3 -skew-x-12 bg-white/25 opacity-0 transition-all duration-700 group-hover:left-[120%] group-hover:opacity-100" />
                   <Sparkles /> Try with sample data
                 </Button>
                 <a href="/Case1_Franchise_Test_Data_Format.xlsx" download className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg focus-ring">
@@ -174,11 +187,8 @@ export default function StartPage() {
           )}
 
           {phase === 'processing' && (
-            <motion.div key="proc" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="card mt-8 w-full max-w-md p-6 text-left">
-              <p className="mb-4 flex items-center gap-2 text-sm text-muted">
-                <FileSpreadsheet className="h-4 w-4" /> {fileName ?? 'Sample dataset'}
-              </p>
-              <Stages current={stage} />
+            <motion.div key="proc" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="card mt-8 w-full bg-surface/90 p-6 backdrop-blur-md">
+              <ProcessingView stage={stage} fileName={fileName} fileSize={fileSize} />
             </motion.div>
           )}
 
@@ -210,41 +220,38 @@ class UserError extends Error {
   }
 }
 
-function SheetChip({ children, builtIn }: { children: ReactNode; builtIn?: boolean }) {
+/** Sheet chip: hover (or focus) to see the columns this sheet should have. */
+function SheetChip({ name, builtIn }: { name: SheetName; builtIn?: boolean }) {
+  const cols = EXPECTED[name];
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border bg-surface px-2.5 py-1 text-xs font-medium text-muted">
-      <FileSpreadsheet className="h-3.5 w-3.5 text-st-approved" aria-hidden />
-      {children}
-      {builtIn && (
-        <span className="inline-flex items-center gap-0.5 text-st-approved">
-          <Check className="h-3 w-3" strokeWidth={3} /> built-in
-        </span>
-      )}
-    </span>
-  );
-}
-
-function Stages({ current }: { current: number }) {
-  return (
-    <ol className="space-y-3" aria-label="Processing">
-      {STAGES.map((s, i) => {
-        const done = i < current;
-        const active = i === current;
-        return (
-          <li key={s} className={cn('flex items-center gap-3 text-sm transition-colors', done ? 'text-fg' : active ? 'font-medium text-fg' : 'text-subtle')}>
-            <span
-              className={cn(
-                'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all',
-                done ? 'border-st-approved bg-st-approved text-white' : active ? 'border-brand text-brand' : 'border-border',
-              )}
-            >
-              {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : active ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-            </span>
-            {s}
-          </li>
-        );
-      })}
-    </ol>
+    <Tooltip
+      content={
+        <div className="py-0.5">
+          <div className="mb-1 font-semibold">{name} · {cols.length} columns</div>
+          <ul className="grid grid-cols-1 gap-x-3 gap-y-0.5 text-muted sm:grid-cols-2">
+            {cols.map((c) => (
+              <li key={c} className="truncate">· {c}</li>
+            ))}
+          </ul>
+          {builtIn && <div className="mt-1.5 text-st-approved">Already built in — no need to upload</div>}
+        </div>
+      }
+      className="max-w-md"
+    >
+      <span
+        tabIndex={0}
+        onClick={(e) => e.stopPropagation()}
+        className="inline-flex cursor-help items-center gap-1.5 rounded-full border bg-surface/90 px-2.5 py-1 text-xs font-medium text-muted transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:text-fg hover:shadow-soft focus-ring"
+      >
+        <FileSpreadsheet className="h-3.5 w-3.5 text-st-approved" aria-hidden />
+        {name}
+        {builtIn && (
+          <span className="inline-flex items-center gap-0.5 text-st-approved">
+            <Check className="h-3 w-3" strokeWidth={3} /> built-in
+          </span>
+        )}
+      </span>
+    </Tooltip>
   );
 }
 
@@ -293,7 +300,7 @@ function Summary({ fileName, check }: { fileName: string | null; check: Workbook
   const rows = preview === 'apps' ? apps.data : preview === 'flags' ? flagged : preview === 'competing' ? competing : [];
 
   return (
-    <div className="card p-5 text-left">
+    <div className="card bg-surface/90 p-5 text-left backdrop-blur-md">
       <div className="flex items-center gap-2">
         <CheckCircle2 className="h-5 w-5 text-st-approved" />
         <p className="font-semibold">Ready</p>
@@ -306,8 +313,12 @@ function Summary({ fileName, check }: { fileName: string | null; check: Workbook
         </>
       )}
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {chips.map((c) => (
-          <button
+        {chips.map((c, i) => (
+          <motion.button
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 * i, duration: 0.35 }}
+            whileHover={{ y: -2 }}
             key={c.key}
             type="button"
             onClick={() => setPreview((p) => (p === c.key ? null : c.key))}
@@ -317,10 +328,10 @@ function Summary({ fileName, check }: { fileName: string | null; check: Workbook
           >
             <span className={cn('flex items-center gap-1.5 text-2xl font-semibold tnum [&_svg]:size-4', c.tone)}>
               {c.icon}
-              {c.value}
+              <CountUp value={c.value} />
             </span>
             <span className="text-2xs text-muted">{c.label}</span>
-          </button>
+          </motion.button>
         ))}
       </div>
       <AnimatePresence>
