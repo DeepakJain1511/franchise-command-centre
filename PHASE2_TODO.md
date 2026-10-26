@@ -22,7 +22,6 @@ No UI component needs to change: screens only use the hooks in `src/engine/hooks
 | `applyScenario` / `revertScenario` | Swap fixtures in memory | Persist the change (backend) and recompute | `mockEngine.ts` |
 | `getTerritoryState()` | Counts of fixture statuses per territory | Fill from real allocation; oversubscription rule | `mockEngine.ts` → `territoryStatesSync` |
 | `getPinStates()` | Derived from fixtures: store → allocated → outside → conflict (≥2 live applicants) → interest → open/full | Add "too close to an existing store" conflicts and real catchment analysis | `mockEngine.ts` → `pinStatesSync` |
-
 | `getPartnerProfile(id)` | Manager by territory/city, payback from tier assumptions, seeded chat | Real CRM assignment, real P&L model per store, message history | `data/mock/partner.ts`, `mockEngine.ts` → `getPartnerProfile` |
 | `sendPartnerMessage(id, text)` | Keyword-matched canned replies after a short delay | Real two-way messaging (backend + notifications) | `mockEngine.ts` → `sendPartnerMessage` |
 
