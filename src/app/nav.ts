@@ -1,5 +1,5 @@
 import {
-  GanttChartSquare, Hexagon, KanbanSquare, LayoutDashboard, Map, MessageSquareText, Settings, Upload, Users, type LucideIcon,
+  GanttChartSquare, Hexagon, KanbanSquare, LayoutDashboard, Map, MessageSquareText, Settings, Store, Upload, Users, type LucideIcon,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -23,5 +23,6 @@ export const NAV: NavItem[] = [
 
 export const NAV_FOOTER: NavItem[] = [
   { to: '/', label: 'Upload data', icon: Upload, question: 'Start', filters: false },
+  { to: '/partner', label: 'Partner portal', icon: Store, question: 'What partners see', filters: false },
   { to: '/settings', label: 'Settings', icon: Settings, question: 'Demo controls', filters: false },
 ];

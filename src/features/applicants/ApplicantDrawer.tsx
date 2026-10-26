@@ -1,5 +1,5 @@
 import {
-  AlertCircle, CalendarClock, CheckSquare, ClipboardList, GanttChartSquare, History, MapPin, MessageSquareText, Square, UserRound, Scale,
+  AlertCircle, CalendarClock, CheckSquare, ClipboardList, GanttChartSquare, History, MapPin, MessageSquareText, Square, Store as StoreIcon, UserRound, Scale,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -44,9 +44,14 @@ export function ApplicantDrawer() {
       }
       footer={
         row && (
-          <Button variant="primary" className="w-full" onClick={() => navigate(`/ask?about=${row.app.id}`)}>
-            <MessageSquareText /> Ask about this applicant
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="primary" className="flex-1" onClick={() => navigate(`/ask?about=${row.app.id}`)}>
+              <MessageSquareText /> Ask about this applicant
+            </Button>
+            <Button onClick={() => navigate(`/partner/${row.app.id}`)} title="See what this partner sees">
+              <StoreIcon /> Partner view
+            </Button>
+          </div>
         )
       }
     >

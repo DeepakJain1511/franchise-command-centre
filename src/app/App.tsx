@@ -16,6 +16,7 @@ const OnboardingPage = lazy(() => import('@/features/onboarding/OnboardingPage')
 const AskPage = lazy(() => import('@/features/whatif/AskPage'));
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'));
 const GalleryPage = lazy(() => import('@/features/dev/GalleryPage'));
+const PartnerPage = lazy(() => import('@/features/partner/PartnerPage'));
 
 function PageFallback() {
   return (
@@ -35,6 +36,8 @@ const S = (el: ReactNode) => <Suspense fallback={<PageFallback />}>{el}</Suspens
 
 const router = createBrowserRouter([
   { path: '/', element: S(<StartPage />), errorElement: <RouteError /> },
+  { path: '/partner', element: S(<PartnerPage />), errorElement: <RouteError /> },
+  { path: '/partner/:id', element: S(<PartnerPage />), errorElement: <RouteError /> },
   {
     element: <AppShell />,
     errorElement: <RouteError />,
