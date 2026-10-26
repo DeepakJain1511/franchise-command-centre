@@ -56,7 +56,7 @@ export function LayerPanel({ model, onFit }: { model: MapModel; onFit: (what: 's
   const f = useFilters();
   const cityFocus = f.city[0] ?? (f.territory[0] ? model.territories.find((t) => t.id === f.territory[0])?.city : undefined);
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col gap-4 overflow-y-auto border-r bg-surface p-4 scrollbar-thin" aria-label="Map layers and filters">
+    <aside className="flex h-full w-64 shrink-0 flex-col gap-4 overflow-y-auto border-r bg-surface p-4 scrollbar-thin [&>*]:shrink-0" aria-label="Map layers and filters">
       <div>
         <h1 className="text-lg font-semibold tracking-tight">Territory map</h1>
         <p className="text-xs text-muted">Where are we, where are we growing?</p>

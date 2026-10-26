@@ -193,12 +193,11 @@ export function FlagChip({ children }: { children: ReactNode }) {
 
 export function Avatar({ name, className }: { name: string; className?: string }) {
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('');
-  const hue = [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+  // Neutral on purpose: colour is reserved for meaning (status, priority, PIN state).
   return (
     <span
       aria-hidden
-      className={cn('inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold', className)}
-      style={{ background: `hsl(${hue} 55% 92%)`, color: `hsl(${hue} 45% 30%)` }}
+      className={cn('inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-raised text-xs font-semibold text-muted', className)}
     >
       {initials}
     </span>

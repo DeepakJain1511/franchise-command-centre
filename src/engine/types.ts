@@ -164,6 +164,8 @@ export const OnboardingPlan = z.object({
   ),
   atRisk: z.boolean(),
   riskNote: z.string().optional(),
+  /** Training modules with completion 0..1 (in the partner's preferred language). */
+  training: z.array(z.object({ id: z.string(), title: z.string(), week: z.number(), hours: z.number(), progress: z.number().min(0).max(1) })),
   startDate: z.string(),
   targetOpen: z.string(),
 });

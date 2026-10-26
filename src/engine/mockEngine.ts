@@ -5,7 +5,7 @@
  * lock, which is a hard visible constraint rather than a decision rule.
  */
 import { applications as appFixtures } from '@/data/mock/applications';
-import { decisionFixtures, STEP_OFFSETS, STEP_OWNER, type DecisionFixture, type ReasonTuple } from '@/data/mock/decisions';
+import { decisionFixtures, STEP_OFFSETS, STEP_OWNER, TRAINING_MODULES, type DecisionFixture, type ReasonTuple } from '@/data/mock/decisions';
 import { pincodes } from '@/data/mock/pincodes';
 import { cannedScenarios } from '@/data/mock/scenarios';
 import { stores as storeFixtures } from '@/data/mock/stores';
@@ -55,8 +55,15 @@ function buildOnboarding(fx: DecisionFixture): OnboardingPlan | null {
   const { step, start, risk } = fx.onboarding;
   const currentIdx = ONBOARDING_STEPS.indexOf(step);
   const isOpen = step === 'Open';
+  // PHASE-2: real logic goes here — read training completion from the LMS.
+  const trainingIdx = ONBOARDING_STEPS.indexOf('Training');
+  const training = TRAINING_MODULES.map((m, i) => ({
+    ...m,
+    progress: currentIdx > trainingIdx ? 1 : currentIdx === trainingIdx ? (i < 2 ? 1 : i < 4 ? 0.5 : 0) : 0,
+  }));
   return {
     current: step,
+    training,
     startDate: start,
     targetOpen: plusDays(start, STEP_OFFSETS.Open),
     atRisk: !!risk,
@@ -230,6 +237,7 @@ class MockEngine implements DecisionEngine {
     return { applicationId, status: d.status, summary: d.summary, reasons: d.reasons, fullReasoning, competitors };
   }
 
+  // PHASE-2: real logic goes here — territory fill comes from the real allocation, not fixture statuses.
   private territoryStatesSync(): TerritoryState[] {
     const decisions = this.decisionsSync();
     return this.territories.map((t) => {
@@ -257,6 +265,7 @@ class MockEngine implements DecisionEngine {
     return this.territoryStatesSync();
   }
 
+  // PHASE-2: real logic goes here — PIN states (incl. "too close to a store" conflicts) from the real engine.
   private pinStatesSync(): PinState[] {
     const decisions = this.decisionsSync();
     const tStates = this.territoryStatesSync();
