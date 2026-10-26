@@ -1,7 +1,7 @@
 import { addDays, parseISO, startOfWeek } from 'date-fns';
 import { MousePointerClick, MoveHorizontal } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
-import { Area, AreaChart, Brush, CartesianGrid, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, Brush, CartesianGrid, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from 'recharts';
 import { ChartCard, ChartSkeleton, DataTable } from '@/components/data';
 import { useFilteredApplicants } from '@/engine/hooks';
 import { DECISION_STATUSES, type DecisionStatus } from '@/engine/types';
@@ -61,6 +61,7 @@ export function ReceivedTimeline() {
   };
 
   const inRange = (i: number) => i >= startIndex && i <= endIndex;
+  const visible = DECISION_STATUSES.filter((s) => !hidden.includes(s));
   const totalSelected = weeks.filter((_, i) => inRange(i)).reduce((n, w) => n + w.total, 0);
 
   return (
@@ -88,7 +89,7 @@ export function ReceivedTimeline() {
           <div className="min-w-0 flex-1" role="img" aria-label="Weekly applications received, stacked by decision">
             <div className="h-48">
               <ResponsiveContainer>
-                <AreaChart
+                <BarChart
                   data={weeks}
                   margin={{ top: 6, right: 8, left: -22, bottom: 0 }}
                   onClick={(e: { activeTooltipIndex?: number }) => {
@@ -99,19 +100,11 @@ export function ReceivedTimeline() {
                   }}
                   className="cursor-pointer"
                 >
-                  <defs>
-                    {DECISION_STATUSES.map((s) => (
-                      <linearGradient key={s} id={`g-${s.replace(/\s/g, '')}`} x1="0" x2="0" y1="0" y2="1">
-                        <stop offset="0" stopColor={c(STATUS_META[s].token)} stopOpacity={0.55} />
-                        <stop offset="1" stopColor={c(STATUS_META[s].token)} stopOpacity={0.15} />
-                      </linearGradient>
-                    ))}
-                  </defs>
                   <CartesianGrid vertical={false} stroke={c('border')} />
                   <XAxis dataKey="label" tick={{ fill: c('subtle'), fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={24} />
                   <YAxis allowDecimals={false} tick={{ fill: c('subtle'), fontSize: 10 }} tickLine={false} axisLine={false} />
                   <RTooltip
-                    cursor={{ stroke: c('brand'), strokeWidth: 1, strokeDasharray: '3 3' }}
+                    cursor={{ fill: c('brand', 0.06) }}
                     content={({ active, payload }) => {
                       if (!active || !payload?.length) return null;
                       const w = payload[0].payload as Week;
@@ -134,16 +127,15 @@ export function ReceivedTimeline() {
                       );
                     }}
                   />
-                  {DECISION_STATUSES.filter((s) => !hidden.includes(s)).map((s) => (
-                    <Area
+                  {visible.map((s, i) => (
+                    <Bar
                       key={s}
-                      type="monotone"
                       dataKey={s}
                       stackId="1"
-                      stroke={c(STATUS_META[s].token)}
-                      strokeWidth={1.5}
-                      fill={`url(#g-${s.replace(/\s/g, '')})`}
-                      animationDuration={500}
+                      fill={c(STATUS_META[s].token, 0.82)}
+                      radius={i === visible.length - 1 ? [4, 4, 0, 0] : 0}
+                      maxBarSize={28}
+                      animationDuration={450}
                     />
                   ))}
                   <Brush
@@ -157,7 +149,7 @@ export function ReceivedTimeline() {
                     tickFormatter={() => ''}
                     onChange={(r: { startIndex?: number; endIndex?: number }) => commit(r.startIndex ?? 0, r.endIndex ?? weeks.length - 1)}
                   />
-                </AreaChart>
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </div>

@@ -76,7 +76,7 @@ export function TerritoryFill() {
                       )}
                     >
                       <span className="flex min-w-0 items-center gap-2">
-                        <span className="text-2xs font-semibold text-subtle tnum">{t.id}</span>
+                        <span className="shrink-0 whitespace-nowrap text-2xs font-semibold text-subtle tnum">{t.id}</span>
                         <span className="truncate text-xs font-medium">{t.name}</span>
                       </span>
                       <span className="flex h-5 items-center gap-[3px]" aria-hidden>
