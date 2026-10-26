@@ -12,12 +12,14 @@ export interface Filters {
   language: Language[];
   pin: string[];
   window: TimeWindow;
+  /** Received-date range picked on the timeline chart (ISO dates, inclusive). */
+  range: [string, string] | null;
 }
-export type ListKey = Exclude<keyof Filters, 'window'>;
+export type ListKey = Exclude<keyof Filters, 'window' | 'range'>;
 export const LIST_KEYS: ListKey[] = ['city', 'territory', 'status', 'stage', 'priority', 'language', 'pin'];
 
 export const EMPTY_FILTERS: Filters = {
-  city: [], territory: [], status: [], stage: [], priority: [], language: [], pin: [], window: 'all',
+  city: [], territory: [], status: [], stage: [], priority: [], language: [], pin: [], window: 'all', range: null,
 };
 
 interface FilterStore extends Filters {
@@ -26,6 +28,7 @@ interface FilterStore extends Filters {
   only: <K extends ListKey>(key: K, value: Filters[K][number]) => void;
   setList: <K extends ListKey>(key: K, values: Filters[K]) => void;
   setWindow: (w: TimeWindow) => void;
+  setRange: (r: [string, string] | null) => void;
   replaceAll: (f: Filters) => void;
   reset: () => void;
 }
@@ -45,13 +48,14 @@ export const useFilters = create<FilterStore>((set) => ({
       return { [key]: list.length === 1 && list[0] === v ? [] : [v] } as Partial<FilterStore>;
     }),
   setList: (key, values) => set({ [key]: values } as Partial<FilterStore>),
-  setWindow: (window) => set({ window }),
+  setWindow: (window) => set({ window, range: null }),
+  setRange: (range) => set({ range, window: 'all' }),
   replaceAll: (f) => set({ ...f }),
   reset: () => set({ ...EMPTY_FILTERS }),
 }));
 
 export const activeFilterCount = (f: Filters) =>
-  LIST_KEYS.reduce((n, k) => n + f[k].length, 0) + (f.window === 'all' ? 0 : 1);
+  LIST_KEYS.reduce((n, k) => n + f[k].length, 0) + (f.window === 'all' ? 0 : 1) + (f.range ? 1 : 0);
 
 /* URL <-> filters */
 export function filtersToParams(f: Filters, base?: URLSearchParams): URLSearchParams {
@@ -62,12 +66,22 @@ export function filtersToParams(f: Filters, base?: URLSearchParams): URLSearchPa
   });
   if (f.window !== 'all') p.set('window', f.window);
   else p.delete('window');
+  if (f.range) {
+    p.set('from', f.range[0]);
+    p.set('to', f.range[1]);
+  } else {
+    p.delete('from');
+    p.delete('to');
+  }
   return p;
 }
 
 export function paramsToFilters(p: URLSearchParams): Filters {
   const list = (k: string) => (p.get(k) ? p.get(k)!.split(',').filter(Boolean) : []);
   const w = p.get('window');
+  const from = p.get('from');
+  const to = p.get('to');
+  const iso = /^\d{4}-\d{2}-\d{2}$/;
   return {
     city: list('city') as City[],
     territory: list('territory'),
@@ -77,5 +91,6 @@ export function paramsToFilters(p: URLSearchParams): Filters {
     language: list('language') as Language[],
     pin: list('pin'),
     window: w === '7d' || w === '30d' || w === '90d' ? w : 'all',
+    range: from && to && iso.test(from) && iso.test(to) ? [from, to] : null,
   };
 }

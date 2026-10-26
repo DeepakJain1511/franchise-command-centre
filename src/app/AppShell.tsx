@@ -1,11 +1,13 @@
 import * as Dialog from '@radix-ui/react-dialog';
+import { motion } from 'framer-motion';
 import {
-  ChevronsLeft, ChevronsRight, Database, Hexagon, Menu, Moon, MoreVertical, RotateCcw, Search, Sun, Upload,
+  ChevronsLeft, ChevronsRight, Database, Hexagon, Keyboard, Menu, Moon, MoreVertical, RotateCcw, Search, Sun, Upload,
 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { CommandPalette } from '@/components/CommandPalette';
 import { FilterBar, FilterUrlSync } from '@/components/FilterBar';
+import { Shortcuts, useShortcuts } from '@/components/Shortcuts';
 import { Toaster } from '@/components/Toaster';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/controls';
@@ -15,6 +17,7 @@ import {
 import { ApplicantDrawer } from '@/features/applicants/ApplicantDrawer';
 import { loadDataset, resetDemo } from '@/lib/actions';
 import { cn } from '@/lib/cn';
+import { useReducedMotion } from '@/lib/hooks';
 import { useData } from '@/store/data';
 import { useUi } from '@/store/ui';
 import { NAV, NAV_FOOTER, type NavItem } from './nav';
@@ -176,6 +179,9 @@ function TopBar() {
             >
               <Database /> Load sample dataset
             </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => useShortcuts.getState().setOpen(true)}>
+              <Keyboard /> Keyboard shortcuts
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => navigate('/')}>
               <Upload /> Upload new Excel
@@ -193,6 +199,22 @@ export function AppShell() {
   const density = useUi((s) => s.density);
   const current = [...NAV, ...NAV_FOOTER].find((n) => pathname === n.to || pathname.startsWith(`${n.to}/`));
   const showFilters = current?.filters ?? false;
+
+  const reduced = useReducedMotion();
+
+  // Cursor spotlight: cards glow softly where the pointer is (CSS reads --mx / --my).
+  useEffect(() => {
+    if (reduced) return;
+    const onMove = (e: PointerEvent) => {
+      const card = (e.target as HTMLElement | null)?.closest?.('.card') as HTMLElement | null;
+      if (!card) return;
+      const r = card.getBoundingClientRect();
+      card.style.setProperty('--mx', `${e.clientX - r.left}px`);
+      card.style.setProperty('--my', `${e.clientY - r.top}px`);
+    };
+    document.addEventListener('pointermove', onMove, { passive: true });
+    return () => document.removeEventListener('pointermove', onMove);
+  }, [reduced]);
 
   // Deep links work without visiting the start screen: quietly load the sample set.
   useEffect(() => {
@@ -213,12 +235,20 @@ export function AppShell() {
         <TopBar />
         {showFilters && <FilterBar />}
         <main id="main" className="min-w-0 flex-1">
-          <Outlet />
+          <motion.div
+            key={pathname}
+            initial={reduced ? false : { opacity: 0, y: 8, filter: 'blur(4px)' }}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)', transitionEnd: { filter: 'none', transform: 'none' } }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <Outlet />
+          </motion.div>
         </main>
       </div>
       <FilterUrlSync />
       <ApplicantDrawer />
       <CommandPalette />
+      <Shortcuts />
       <Toaster />
     </div>
   );

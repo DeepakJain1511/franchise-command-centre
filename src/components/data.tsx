@@ -7,21 +7,44 @@ import { useUi } from '@/store/ui';
 import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Tooltip } from './ui/overlay';
 
-/* ---------------- CountUp (runs once) ---------------- */
+/* ---------------- CountUp: counts in once, then rolls between values ---------------- */
 export function CountUp({ value, format = (n: number) => String(Math.round(n)) }: { value: number; format?: (n: number) => string }) {
   const reduced = useReducedMotion();
   const [shown, setShown] = useState(reduced ? value : 0);
-  const first = useRef(true);
+  const from = useRef(reduced ? value : 0);
   useEffect(() => {
-    if (reduced || !first.current) {
+    if (reduced) {
       setShown(value);
+      from.current = value;
       return;
     }
-    first.current = false;
-    const c = animate(0, value, { duration: 0.6, ease: 'easeOut', onUpdate: setShown });
+    const c = animate(from.current, value, {
+      duration: from.current === 0 ? 0.6 : 0.45,
+      ease: [0.22, 1, 0.36, 1],
+      onUpdate: (v) => {
+        from.current = v;
+        setShown(v);
+      },
+    });
     return () => c.stop();
   }, [value, reduced]);
   return <span className="tnum">{format(shown)}</span>;
+}
+
+/* ---------------- Reveal: soft staggered entrance (fade + rise + un-blur) ---------------- */
+export function Reveal({ children, delay = 0, className }: { children: ReactNode; delay?: number; className?: string }) {
+  const reduced = useReducedMotion();
+  if (reduced) return <div className={className}>{children}</div>;
+  return (
+    <motion.div
+      className={className}
+      initial={{ opacity: 0, y: 10, filter: 'blur(6px)' }}
+      animate={{ opacity: 1, y: 0, filter: 'blur(0px)', transitionEnd: { filter: 'none', transform: 'none' } }}
+      transition={{ duration: 0.45, delay, ease: [0.22, 1, 0.36, 1] }}
+    >
+      {children}
+    </motion.div>
+  );
 }
 
 /* ---------------- Sparkline ---------------- */

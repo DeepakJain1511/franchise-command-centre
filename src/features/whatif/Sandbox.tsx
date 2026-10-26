@@ -1,10 +1,10 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, Check, FlaskConical, History, Play, RotateCcw, Undo2, Waves } from 'lucide-react';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ReasonChip, StatusChip } from '@/components/chips';
 import { ListSkeleton } from '@/components/data';
 import { Button } from '@/components/ui/button';
-import { Segmented, Select, Slider } from '@/components/ui/controls';
+import { Segmented, Select, Slider, Switch } from '@/components/ui/controls';
 import { Tooltip } from '@/components/ui/overlay';
 import { useApplicants, useScenarioCommit, useScenarioPresets, useSimulate } from '@/engine/hooks';
 import type { Application, DecisionStatus, Floor, Reason, ScenarioChange, ScenarioResult, SpaceAvailable } from '@/engine/types';
@@ -53,10 +53,13 @@ export function Sandbox({ request }: { request: SandboxRequest | null }) {
     if (original) setDraft(original);
   }, [original]);
 
-  const run = async (change: ScenarioChange) => {
+  const lastRun = useRef('');
+  const run = async (change: ScenarioChange, opts: { quiet?: boolean } = {}) => {
+    lastRun.current = JSON.stringify(change);
     const r = await sim.run(change);
     setResult(r);
-    addSimulation(r);
+    // Live re-runs only land in history when they produce a real outcome change.
+    if (!opts.quiet || r.canned) addSimulation(r);
   };
 
   // External requests (from Ask, ?about=, or preset chips)
@@ -87,6 +90,17 @@ export function Sandbox({ request }: { request: SandboxRequest | null }) {
     ? { applicationId: appId, ...Object.fromEntries(edited.map((k) => [k, draft[k]])) }
     : null;
   const applied = result ? appliedIds.includes(result.id) : false;
+
+  // Live mode: re-run shortly after the user stops dragging / toggling.
+  const [live, setLive] = useState(true);
+  const changeKey = change && edited.length ? JSON.stringify(change) : '';
+  useEffect(() => {
+    if (!live || !changeKey || changeKey === lastRun.current || applied) return;
+    const id = window.setTimeout(() => void run(JSON.parse(changeKey) as ScenarioChange, { quiet: true }), 450);
+    return () => window.clearTimeout(id);
+    // run is stable enough for this debounce; the key captures the inputs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changeKey, live, applied]);
 
   const options = (apps.data ?? []).map((r) => ({ value: r.app.id, label: `${r.app.id} · ${r.app.name}` }));
 
@@ -181,7 +195,10 @@ export function Sandbox({ request }: { request: SandboxRequest | null }) {
                     </Button>
                   </Tooltip>
                 </div>
-                {!edited.length && <p className="text-center text-2xs text-subtle">Change a field to simulate</p>}
+                <label className="flex items-center justify-between gap-2 text-2xs text-muted">
+                  <span>{live ? 'Live: re-runs as you change fields' : 'Live updates off'}</span>
+                  <Switch checked={live} onCheckedChange={setLive} aria-label="Live simulation" />
+                </label>
               </>
             )}
           </div>

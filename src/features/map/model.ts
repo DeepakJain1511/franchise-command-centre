@@ -23,6 +23,9 @@ interface MapUi {
   view: 'map' | 'table';
   selecting: boolean;
   area: string[]; // PINs picked with the rectangle tool
+  /** Time-lapse: show the network as of this date (null = live). */
+  asOf: string | null;
+  setAsOf: (d: string | null) => void;
   setLayer: (k: keyof Layers, v: boolean) => void;
   setRingKm: (n: number) => void;
   setView: (v: 'map' | 'table') => void;
@@ -36,6 +39,8 @@ export const useMapUi = create<MapUi>((set) => ({
   view: 'map',
   selecting: false,
   area: [],
+  asOf: null,
+  setAsOf: (asOf) => set({ asOf }),
   setLayer: (k, v) => set((s) => ({ layers: { ...s.layers, [k]: v } })),
   setRingKm: (ringKm) => set({ ringKm }),
   setView: (view) => set({ view }),
@@ -154,4 +159,20 @@ export function cannibalisationPins(model: MapModel, ringKm: number): Set<string
     if (model.storeCells.some((s) => s.cell.city === cell.city && overlapsRing(cell, s.cell.center, ringKm))) out.add(p.pin);
   }
   return out;
+}
+
+/**
+ * PIN state as of a past date, for the time-lapse (presentation only): applicants appear
+ * on the day they applied, planned stores from their onboarding start.
+ */
+export function pinStateAsOf(model: MapModel, p: PinState, asOf: string | null): { status: PinState['status']; applicants: number } {
+  if (!asOf) return { status: p.status, applicants: p.applicantIds.length };
+  if (p.status === 'store') return { status: 'store', applicants: 0 };
+  const apps = p.applicantIds.map((id) => model.rowById.get(id)).filter((r): r is ApplicantRow => !!r && r.app.submittedAt <= asOf);
+  const planned = p.allocatedTo ? model.rowById.get(p.allocatedTo) : undefined;
+  if (planned?.decision.onboarding && planned.decision.onboarding.startDate <= asOf) return { status: 'allocated', applicants: apps.length };
+  if (!p.territoryId) return { status: 'outside', applicants: apps.length };
+  if (apps.length >= 2) return { status: 'conflict', applicants: apps.length };
+  if (apps.length === 1) return { status: 'interest', applicants: 1 };
+  return { status: p.status === 'full' ? 'full' : 'open', applicants: 0 };
 }

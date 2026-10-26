@@ -12,6 +12,7 @@ import { CoverageTable } from './CoverageTable';
 import { cellBounds, KARNATAKA, MapCanvas } from './MapCanvas';
 import { BottomStrip, DetailPanel, LayerPanel } from './MapPanels';
 import { useMapModel, useMapUi } from './model';
+import { TimeLapse } from './TimeLapse';
 
 export default function MapPage() {
   const { model, error } = useMapModel();
@@ -66,6 +67,7 @@ export default function MapPage() {
           <>
             <MapCanvas model={model} onReady={onReady} onView={setBounds} rightPad={panelOpen ? 330 : 0} />
             <DetailPanel model={model} />
+            <TimeLapse model={model} />
             <BottomStrip model={model} view={bounds} />
             {!wide && (
               <Popover>

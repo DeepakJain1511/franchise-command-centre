@@ -8,7 +8,7 @@ import { useColors, useReducedMotion } from '@/lib/hooks';
 import { PIN_META, PRIORITY_META, tokenColor } from '@/lib/tokens';
 import { useFilters } from '@/store/filters';
 import { useUi } from '@/store/ui';
-import { cannibalisationPins, useMapUi, type MapModel } from './model';
+import { cannibalisationPins, pinStateAsOf, useMapUi, type MapModel } from './model';
 
 export const KARNATAKA: LatLngBoundsExpression = [
   [11.55, 74.05],
@@ -163,7 +163,8 @@ export function MapCanvas({ model, onReady, onView, rightPad }: {
   const theme = useUi((s) => s.theme);
   const c = useColors();
   const f = useFilters();
-  const { layers, ringKm, area } = useMapUi();
+  const { layers, ringKm, area, asOf } = useMapUi();
+  const asOfState = (p: PinState) => pinStateAsOf(model, p, asOf);
   const [zoom, setZoom] = useState(7);
 
   const stateLevel = zoom < CITY_ZOOM;
@@ -213,12 +214,13 @@ export function MapCanvas({ model, onReady, onView, rightPad }: {
       {stateLevel ? (
         model.cities.map((city) => {
           const color = city.topPriority ? c(PRIORITY_META[city.topPriority].token) : c('subtle');
-          const size = Math.round(28 + city.slots * 3);
+          const soFar = asOf ? model.rows.filter((r) => r.app.city === city.city && r.app.submittedAt <= asOf).length : null;
+          const size = soFar !== null ? Math.round(22 + soFar * 3.5) : Math.round(28 + city.slots * 3);
           const open = city.slots - city.filled;
           // The bubble itself is the icon box, anchored at its centre on the true city point;
           // the name label hangs below it without shifting the anchor.
           const html = `<div style="position:relative;width:${size}px;height:${size}px">
-              <div style="width:100%;height:100%;border-radius:999px;background:${city.slots ? color : c('pin-outside')};box-shadow:0 0 0 3px ${c('surface')},0 4px 14px -6px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;color:${city.topPriority === 'Low' ? c('fg') : '#fff'};font:700 13px Inter,sans-serif;font-variant-numeric:tabular-nums">${city.slots ? `${open}` : '–'}</div>
+              <div style="width:100%;height:100%;border-radius:999px;background:${city.slots ? color : c('pin-outside')};box-shadow:0 0 0 3px ${c('surface')},0 4px 14px -6px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;color:${city.topPriority === 'Low' ? c('fg') : '#fff'};font:700 13px Inter,sans-serif;font-variant-numeric:tabular-nums;transition:all .35s ease">${soFar !== null ? soFar : city.slots ? `${open}` : '–'}</div>
               <div style="position:absolute;top:calc(100% + 5px);left:50%;transform:translateX(-50%);white-space:nowrap;text-align:center;font:600 11px Inter,sans-serif;color:${c('fg')};text-shadow:0 0 3px ${c('surface')},0 0 3px ${c('surface')}">${city.city}</div>
             </div>`;
           return (
@@ -243,11 +245,12 @@ export function MapCanvas({ model, onReady, onView, rightPad }: {
             const p = model.byPin.get(cell.pin);
             if (!p) return null;
             // Tiles sit at their real locations, so each always shows its own PIN state.
-            const meta = PIN_META[p.status];
+            const st = asOfState(p);
+            const meta = PIN_META[st.status];
             let fill = c(meta.token);
             let opacity = 0.72;
-            if (p.status === 'outside') opacity = 0.45;
-            if (p.status === 'full') {
+            if (st.status === 'outside') opacity = 0.45;
+            if (st.status === 'full') {
               fill = c('subtle');
               opacity = 0.22;
             }
@@ -276,7 +279,7 @@ export function MapCanvas({ model, onReady, onView, rightPad }: {
                     <span className="h-2 w-2 rounded-full" style={{ background: c(meta.token) }} />
                     {meta.label}
                     {p.locked && ' · locked'}
-                    {p.applicantIds.length > 0 && ` · ${p.applicantIds.length} applicant${p.applicantIds.length > 1 ? 's' : ''}`}
+                    {st.applicants > 0 && ` · ${st.applicants} applicant${st.applicants > 1 ? 's' : ''}`}
                   </div>
                   {p.locked && <div className="mt-0.5 text-2xs text-muted">One store per PIN</div>}
                 </Tooltip>
@@ -337,7 +340,9 @@ export function MapCanvas({ model, onReady, onView, rightPad }: {
           {/* Applicant interest badges */}
           {layers.interest &&
             model.pins
-              .filter((p) => p.applicantIds.length > 0 && (p.status === 'interest' || p.status === 'conflict' || p.status === 'outside'))
+              .map((p) => ({ p, st: asOfState(p) }))
+              .filter(({ st }) => st.applicants > 0 && (st.status === 'interest' || st.status === 'conflict' || st.status === 'outside'))
+              .map(({ p, st }) => ({ ...p, status: st.status, applicantIds: p.applicantIds.slice(0, st.applicants) }))
               .map((p) => {
                 const cell = model.layout.cells.get(p.pin);
                 if (!cell) return null;
@@ -359,7 +364,7 @@ export function MapCanvas({ model, onReady, onView, rightPad }: {
           {/* Planned (allocated) stores */}
           {layers.planned &&
             model.pins
-              .filter((p) => p.status === 'allocated')
+              .filter((p) => asOfState(p).status === 'allocated')
               .map((p) => {
                 const cell = model.layout.cells.get(p.pin);
                 if (!cell) return null;

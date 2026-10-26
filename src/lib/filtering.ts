@@ -28,9 +28,13 @@ export function reachedStage(stage: Stage, d: Decision): boolean {
 
 const WINDOW_DAYS = { '7d': 7, '30d': 30, '90d': 90 } as const;
 
-export function applyFilters(rows: ApplicantRow[], f: Filters, ignore?: ListKey | ListKey[]): ApplicantRow[] {
-  const skip = new Set(Array.isArray(ignore) ? ignore : ignore ? [ignore] : []);
+/** Filter keys a widget can ignore (its own dimension), incl. the timeline range. */
+export type IgnoreKey = ListKey | 'range';
+
+export function applyFilters(rows: ApplicantRow[], f: Filters, ignore?: IgnoreKey | IgnoreKey[]): ApplicantRow[] {
+  const skip = new Set<IgnoreKey>(Array.isArray(ignore) ? ignore : ignore ? [ignore] : []);
   const on = (k: ListKey) => !skip.has(k) && f[k].length > 0;
+
   return rows.filter(({ app, decision, territory }) => {
     if (on('city') && !f.city.includes(app.city)) return false;
     if (on('territory') && !(decision.territoryId && f.territory.includes(decision.territoryId))) return false;
@@ -40,6 +44,7 @@ export function applyFilters(rows: ApplicantRow[], f: Filters, ignore?: ListKey 
     if (on('language') && !f.language.includes(app.language)) return false;
     if (on('pin') && !f.pin.includes(app.pin)) return false;
     if (f.window !== 'all' && daysAgo(app.submittedAt) > WINDOW_DAYS[f.window]) return false;
+    if (f.range && !skip.has('range') && (app.submittedAt < f.range[0] || app.submittedAt > f.range[1])) return false;
     return true;
   });
 }

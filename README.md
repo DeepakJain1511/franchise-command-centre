@@ -31,6 +31,15 @@ SPA routes. No environment variables.
    *See the diff*: On hold → Approved, 3 reasons flip, TER-03 slots 1 → 0, APP-021 → Waitlisted.
    *Apply change* updates every screen; *Revert* undoes it.
 
+**Things to play with**
+- **Applications received** (Overview): drag the handles under the chart to pick dates — every widget
+  filters to that range and the numbers roll to their new values; click a week to zoom to it.
+- **Time-lapse** (Map): press ▶ to replay how applications arrived and stores got planned, week by week,
+  or drag the scrubber.
+- **Live what-if**: change space, floor or size in the sandbox and the outcome re-runs as you drag.
+- **Keyboard**: `G` then `O`/`M`/`A`/`P`/`T`/`N`/`W` jumps between screens, `/` searches, `?` lists shortcuts.
+- Cards follow the cursor with a soft spotlight; screens fade in with a gentle blur-in.
+
 Useful deep links: `/map?pin=560068`, `/map?territory=TER-02`, `/applicants?view=attention`,
 `/overview?status=On+hold`, `/applicants?app=APP-007`, `/dev/components` (component gallery).
 Press **Ctrl/⌘ K** anywhere to jump to an applicant, territory or screen.

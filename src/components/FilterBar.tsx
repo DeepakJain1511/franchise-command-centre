@@ -4,6 +4,7 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 import { CITIES, DECISION_STATUSES, type Language, type Priority } from '@/engine/types';
 import { useDataset } from '@/engine/hooks';
 import { cn } from '@/lib/cn';
+import { fmtDate } from '@/lib/time';
 import {
   activeFilterCount, filtersToParams, LIST_KEYS, paramsToFilters, useFilters, type Filters, type ListKey, type TimeWindow,
 } from '@/store/filters';
@@ -44,7 +45,7 @@ export function FilterUrlSync() {
   // store -> URL
   const current: Filters = {
     city: filters.city, territory: filters.territory, status: filters.status, stage: filters.stage,
-    priority: filters.priority, language: filters.language, pin: filters.pin, window: filters.window,
+    priority: filters.priority, language: filters.language, pin: filters.pin, window: filters.window, range: filters.range,
   };
   const key = JSON.stringify(current);
   useEffect(() => {
@@ -121,6 +122,9 @@ export function FilterBar() {
                 (filters[k] as string[]).map((v) => (
                   <FilterChip key={`${k}:${v}`} label={LABEL[k]} value={v} onRemove={() => filters.toggle(k, v as Filters[typeof k][number])} />
                 )),
+              )}
+              {filters.range && (
+                <FilterChip label="Received" value={`${fmtDate(filters.range[0])} – ${fmtDate(filters.range[1])}`} onRemove={() => filters.setRange(null)} />
               )}
             </div>
             <Button size="sm" variant="ghost" className="ml-auto shrink-0" onClick={filters.reset}>
