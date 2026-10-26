@@ -10,13 +10,14 @@ import { Toaster } from '@/components/Toaster';
 import { Tooltip } from '@/components/ui/overlay';
 import { Button } from '@/components/ui/button';
 import { useApplicants, useDataset, useTerritoryStates } from '@/engine/hooks';
-import { loadDataset } from '@/lib/actions';
+import { inspectUpload, loadDataset } from '@/lib/actions';
 import { cn } from '@/lib/cn';
 import { inrLakh } from '@/lib/format';
 import { useReducedMotion } from '@/lib/hooks';
 import { useData } from '@/store/data';
 import { useUi } from '@/store/ui';
-import { checkWorkbook, EXPECTED, fileTypeError, type SheetName, type WorkbookCheck } from './checkWorkbook';
+import { EXPECTED_COLUMNS, type ParseReport, type SheetReport } from '@/engine/parse';
+import { DatasetError } from '@/engine/realEngine';
 import { ProcessingView, STAGES } from './ProcessingView';
 import { StartBackdrop } from './StartBackdrop';
 
@@ -29,7 +30,7 @@ export default function StartPage() {
   const [drag, setDrag] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileSize, setFileSize] = useState<number | null>(null);
-  const [check, setCheck] = useState<WorkbookCheck | null>(null);
+  const [check, setCheck] = useState<ParseReport | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -53,15 +54,11 @@ export default function StartPage() {
     setFileSize(source === 'sample' ? null : source.size);
     try {
       if (source !== 'sample') {
-        const typeErr = fileTypeError(source);
-        if (typeErr) throw new UserError([typeErr]);
-        const XLSX = await import('xlsx');
-        const wb = XLSX.read(await source.arrayBuffer());
-        await tick(350);
+        await tick(250);
+        const c = await inspectUpload(source);
         setStage(1);
-        const c = checkWorkbook(wb, XLSX.utils);
         setCheck(c);
-        if (!c.ok) throw new UserError(c.errors);
+        if (!c.ok) throw new UserError(c.errors.length ? c.errors : ['That file could not be read. Is it the Excel template?']);
         await tick(350);
       } else {
         await tick(300);
@@ -77,7 +74,7 @@ export default function StartPage() {
       setStage(STAGES.length);
       setPhase('done');
     } catch (e) {
-      setErrors(e instanceof UserError ? e.messages : ['That file could not be read. Is it the Excel template?']);
+      setErrors(e instanceof UserError || e instanceof DatasetError ? e.messages : ['That file could not be read. Is it the Excel template?']);
       setPhase('error');
     }
   };
@@ -180,14 +177,14 @@ export default function StartPage() {
                     </motion.span>
                     <div>
                       <p className="text-base font-semibold">{drag ? 'Release to upload' : 'Drop your Excel here'}</p>
-                      <p className="text-sm text-muted">or click to browse · .xlsx</p>
+                      <p className="text-sm text-muted">or click to browse · .xlsx / .xls / .csv</p>
                     </div>
                     <div className="flex flex-wrap justify-center gap-2" aria-label="Expected sheets">
                       <SheetChip name="Applications" />
                       <SheetChip name="Territories" />
                       <SheetChip name="Existing stores" builtIn />
                     </div>
-                    <input ref={inputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => onFiles(e.target.files)} />
+                    <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => onFiles(e.target.files)} />
                   </div>
 
                   {phase === 'error' && (
@@ -215,10 +212,15 @@ export default function StartPage() {
                     <span aria-hidden className="pointer-events-none absolute inset-y-0 -left-1/2 w-1/3 -skew-x-12 bg-white/25 opacity-0 transition-all duration-700 group-hover:left-[120%] group-hover:opacity-100" />
                     <Sparkles /> Try with sample data
                   </Button>
-                  <div className="mt-3 flex items-center justify-between text-xs text-muted">
-                    <a href="/Case1_Franchise_Test_Data_Format.xlsx" download className="inline-flex items-center gap-1.5 hover:text-fg focus-ring">
-                      <Download className="h-3.5 w-3.5" /> Download template
-                    </a>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+                    <span className="flex flex-wrap gap-3">
+                      <a href="/Case1_Franchise_Test_Data_Format.xlsx" download className="inline-flex items-center gap-1.5 hover:text-fg focus-ring">
+                        <Download className="h-3.5 w-3.5" /> Download template
+                      </a>
+                      <a href="/sample_data.xlsx" download className="inline-flex items-center gap-1.5 hover:text-fg focus-ring">
+                        <FileSpreadsheet className="h-3.5 w-3.5" /> Sample data (.xlsx)
+                      </a>
+                    </span>
                     <span>No login · ~5 seconds</span>
                   </div>
                 </motion.div>
@@ -259,8 +261,8 @@ class UserError extends Error {
 }
 
 /** Sheet chip: hover (or focus) to see the columns this sheet should have. */
-function SheetChip({ name, builtIn }: { name: SheetName; builtIn?: boolean }) {
-  const cols = EXPECTED[name];
+function SheetChip({ name, builtIn }: { name: SheetReport['kind']; builtIn?: boolean }) {
+  const cols = EXPECTED_COLUMNS[name];
   return (
     <Tooltip
       content={
@@ -293,27 +295,28 @@ function SheetChip({ name, builtIn }: { name: SheetName; builtIn?: boolean }) {
   );
 }
 
-function SheetSummary({ check, className }: { check: WorkbookCheck; className?: string }) {
+function SheetSummary({ check, className }: { check: ParseReport; className?: string }) {
   return (
     <div className={cn('flex flex-wrap gap-2', className)}>
       {check.sheets.map((s) => (
         <span
-          key={s.name}
+          key={s.kind}
+          title={s.sheetName ? `Found in sheet "${s.sheetName}"` : undefined}
           className={cn(
             'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs',
             !s.found && !s.builtIn ? 'border-st-rejected/30 text-st-rejected' : s.missingColumns.length ? 'border-st-hold/40 text-st-hold' : 'text-muted',
           )}
         >
           {s.found && !s.missingColumns.length ? <CheckCircle2 className="h-3.5 w-3.5 text-st-approved" /> : <TriangleAlert className="h-3.5 w-3.5" />}
-          {s.name}
-          <span className="tnum">{s.found ? `${s.rows} row${s.rows === 1 ? '' : 's'}` : s.builtIn ? 'built-in' : 'missing'}</span>
+          {s.kind}
+          <span className="tnum">{s.builtIn ? 'built-in' : s.found ? `${s.rows} row${s.rows === 1 ? '' : 's'}` : 'missing'}</span>
         </span>
       ))}
     </div>
   );
 }
 
-function Summary({ fileName, check }: { fileName: string | null; check: WorkbookCheck | null }) {
+function Summary({ fileName, check }: { fileName: string | null; check: ParseReport | null }) {
   const apps = useApplicants();
   const ds = useDataset();
   const ts = useTerritoryStates();
@@ -347,7 +350,18 @@ function Summary({ fileName, check }: { fileName: string | null; check: Workbook
       {check && (
         <>
           <SheetSummary check={check} className="mt-3" />
-          <p className="mt-2 text-2xs text-subtle">Phase 1: the file is checked, results use the sample dataset.</p>
+          {check.warnings.length > 0 && (
+            <details className="mt-2 rounded-md border px-3 py-2 text-xs text-muted">
+              <summary className="cursor-pointer select-none font-medium">
+                {check.warnings.length} note{check.warnings.length === 1 ? '' : 's'} from reading the file
+              </summary>
+              <ul className="mt-1.5 max-h-32 space-y-1 overflow-y-auto scrollbar-thin">
+                {check.warnings.map((w) => (
+                  <li key={w}>· {w}</li>
+                ))}
+              </ul>
+            </details>
+          )}
         </>
       )}
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">

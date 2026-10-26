@@ -1,9 +1,22 @@
 /**
- * The active DecisionEngine. To plug in the real engine in Phase 2, implement
- * `DecisionEngine` (see ./types.ts) and change this ONE import.
+ * The active DecisionEngine — the rule engine from the Build Spec (runPipeline), wrapped with per-browser state.
  */
-import { mockEngine } from './mockEngine';
+import { setDemoDay } from '@/lib/time';
+import { useData } from '@/store/data';
+import { realEngine } from './realEngine';
 import type { DecisionEngine } from './types';
 
-export const engine: DecisionEngine = mockEngine;
+export const engine: DecisionEngine & Pick<typeof realEngine, 'inspectFile' | 'sessionInfo'> = realEngine;
+setDemoDay(realEngine.getDay());
+
+// A partner tab and a company tab in the same browser stay in sync (state is per-browser localStorage).
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key !== 'fcc:state:v1') return;
+    realEngine.restore();
+    setDemoDay(realEngine.getDay());
+    useData.getState().bump();
+  });
+}
+
 export * from './types';

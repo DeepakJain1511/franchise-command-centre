@@ -1,9 +1,11 @@
-import { Database, FlaskConical, Moon, RotateCcw, Sun } from 'lucide-react';
+import { Database, FlaskConical, Moon, RotateCcw, Sun, Undo2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { PageHeader } from '@/app/AppShell';
 import { LanguageBadge } from '@/components/chips';
 import { Button } from '@/components/ui/button';
 import { Segmented } from '@/components/ui/controls';
+import { useAiStatus } from '@/app/ShellExtras';
+import { useEngineActions, useOverrides } from '@/engine/hooks';
 import { loadDataset, resetDemo } from '@/lib/actions';
 import { useUi, type Density, type Theme } from '@/store/ui';
 
@@ -25,6 +27,9 @@ export default function SettingsPage() {
   const density = useUi((s) => s.density);
   const setDensity = useUi((s) => s.setDensity);
   const toast = useUi((s) => s.toast);
+  const overrides = useOverrides();
+  const act = useEngineActions();
+  const ai = useAiStatus();
 
   return (
     <div className="pb-10">
@@ -63,7 +68,17 @@ export default function SettingsPage() {
 
         <section className="card divide-y" aria-label="Data">
           <h2 className="label px-4 pb-1 pt-3.5">Data</h2>
-          <Row title="Reset demo data" hint="Undo applied what-ifs, filters and history.">
+          <Row title={`Follow-up changes · ${overrides.length}`} hint="Every update is kept as a change on a working copy. The uploaded file is never modified.">
+            <div className="flex gap-2">
+              <Button size="sm" disabled={!overrides.length || act.busy} onClick={async () => (await act.undoLast(), toast('Last change undone', 'success'))}>
+                <Undo2 /> Undo last
+              </Button>
+              <Button size="sm" disabled={!overrides.length || act.busy} onClick={async () => (await act.resetOverrides(), toast('All changes cleared', 'success'))}>
+                <RotateCcw /> Clear all
+              </Button>
+            </div>
+          </Row>
+          <Row title="Reset demo data" hint="Back to the sample data: clears changes, the time slider, chats and filters.">
             <Button
               size="sm"
               onClick={async () => {
@@ -89,7 +104,13 @@ export default function SettingsPage() {
 
         <div className="flex items-start gap-3 rounded-lg border border-dashed border-brand/40 bg-brand-soft px-4 py-3 text-sm">
           <FlaskConical className="mt-0.5 h-4 w-4 shrink-0 text-brand" aria-hidden />
-          <p>Decisions are mocked in Phase 1 — every outcome comes from fixtures via the swappable DecisionEngine.</p>
+          <div className="space-y-1">
+            <p>Every decision comes from the rule engine in the Build Spec — scores, gates, slot allocation, one store per PIN — so the same data always gives the same answer.</p>
+            <p className="text-muted">
+              Gemini {ai?.enabled ? `is on (${ai.model})` : 'is off'}: it only reads free-text follow-ups, drafts chat replies and cross-checks the rubric. It never decides.
+              Your changes stay in this browser only.
+            </p>
+          </div>
         </div>
       </div>
     </div>

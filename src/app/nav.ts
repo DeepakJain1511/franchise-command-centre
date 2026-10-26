@@ -1,5 +1,5 @@
 import {
-  GanttChartSquare, Hexagon, KanbanSquare, LayoutDashboard, Map, MessageSquareText, Settings, Store, Upload, Users, type LucideIcon,
+  GanttChartSquare, Hexagon, Inbox, KanbanSquare, LayoutDashboard, Map, MessageSquareText, Settings, ShieldCheck, Store, Upload, Users, type LucideIcon,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -19,6 +19,8 @@ export const NAV: NavItem[] = [
   { to: '/territories', label: 'Territories', icon: Hexagon, question: 'How full is each territory?', filters: true },
   { to: '/onboarding', label: 'Onboarding', icon: GanttChartSquare, question: 'How do partners get to open?', filters: true },
   { to: '/ask', label: 'Ask & What-if', icon: MessageSquareText, question: 'Why X? What if Y?', filters: false },
+  { to: '/inbox', label: 'Partner inbox', icon: Inbox, question: 'What are partners asking?', filters: false },
+  { to: '/checks', label: 'Checks', icon: ShieldCheck, question: 'Is every decision by the rules?', filters: false },
 ];
 
 export const NAV_FOOTER: NavItem[] = [

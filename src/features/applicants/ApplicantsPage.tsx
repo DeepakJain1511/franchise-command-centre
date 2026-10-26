@@ -29,7 +29,9 @@ const VIEWS: Array<{ key: View; label: string; icon: typeof Users }> = [
 
 const col = createColumnHelper<ApplicantRow>();
 const SPACE_FIELDS = new Set(['space', 'spaceSqft', 'floor']);
-const today = iso(DEMO_TODAY);
+/** Demo "today" moves with the time slider — read it at render time. */
+const today = () => iso(DEMO_TODAY);
+const HEALTH_TONE = { 'On track': 'text-st-approved', 'At risk': 'text-st-hold', Delayed: 'text-st-rejected' } as const;
 
 function nextStep(r: ApplicantRow) {
   return r.decision.nextSteps.find((s) => !s.done) ?? null;
@@ -75,7 +77,7 @@ const columns = [
     id: 'experience',
     header: 'Exp.',
     meta: { align: 'right' },
-    cell: (c) => <span className="tnum">{c.getValue()} y</span>,
+    cell: (c) => <span className="tnum">{c.getValue() === null ? '—' : `${c.getValue()} y`}</span>,
   }),
   col.accessor((r) => r.app.space, {
     id: 'space',
@@ -96,17 +98,69 @@ const columns = [
     id: 'launch',
     header: 'Launch',
     meta: { align: 'right' },
-    cell: (c) => <span className="tnum">{c.getValue()} mo</span>,
+    cell: (c) => <span className="tnum">{c.getValue() === null ? '—' : `${c.getValue()} mo`}</span>,
   }),
   col.accessor((r) => r.app.language, {
     id: 'language',
     header: 'Language',
     cell: (c) => <LanguageBadge language={c.getValue()} size="sm" native={false} />,
   }),
+  col.accessor((r) => r.decision.territoryId ?? '', {
+    id: 'territory',
+    header: 'Territory',
+    cell: (c) => <span className="text-xs tnum text-muted">{c.getValue() || '—'}</span>,
+  }),
+  col.accessor((r) => r.decision.result.adjustedPct, {
+    id: 'score',
+    header: 'Score',
+    meta: { align: 'right' },
+    cell: (c) => {
+      const r = c.row.original.decision.result;
+      return (
+        <Tooltip content={`Bar ${r.bar}${r.score.assessableMax < 100 ? ` · scored on ${r.score.assessableMax} of 100` : ''}`}>
+          <span className={cn('font-semibold tnum', r.adjustedPct >= r.bar ? 'text-fg' : 'text-st-rejected')}>{Math.round(r.adjustedPct)}</span>
+        </Tooltip>
+      );
+    },
+  }),
   col.accessor((r) => r.decision.status, {
     id: 'decision',
     header: 'Decision',
     cell: (c) => <DecisionBadge decision={c.row.original.decision} size="sm" />,
+  }),
+  col.accessor((r) => `${r.decision.text.outcome} ${r.decision.text.sub ?? ''}`, {
+    id: 'outcome',
+    header: 'Outcome',
+    cell: (c) => (
+      <span className="block max-w-[220px] truncate text-xs">
+        {c.row.original.decision.text.outcome}
+        {c.row.original.decision.text.sub && <span className="text-subtle"> · {c.row.original.decision.text.sub}</span>}
+      </span>
+    ),
+  }),
+  col.accessor((r) => r.decision.stage, {
+    id: 'stage',
+    header: 'Stage',
+    cell: (c) => <span className="whitespace-nowrap text-xs">{c.getValue()}</span>,
+  }),
+  col.accessor((r) => r.decision.result.onboarding?.tasksDonePct ?? -1, {
+    id: 'tasks',
+    header: 'Tasks',
+    meta: { align: 'right' },
+    cell: (c) => <span className="text-xs tnum">{c.row.original.decision.result.outcome === 'APPROVE' ? `${c.getValue()}%` : '—'}</span>,
+  }),
+  col.accessor((r) => (r.decision.result.outcome === 'APPROVE' ? r.decision.result.onboarding?.openingDate ?? '' : ''), {
+    id: 'opening',
+    header: 'Opening',
+    cell: (c) => <span className="whitespace-nowrap text-xs tnum">{c.getValue() ? fmtDate(c.getValue()) : '—'}</span>,
+  }),
+  col.accessor((r) => (r.decision.result.outcome === 'APPROVE' ? r.decision.result.onboarding?.health ?? '' : ''), {
+    id: 'health',
+    header: 'Health',
+    cell: (c) => {
+      const h = c.getValue() as keyof typeof HEALTH_TONE | '';
+      return h ? <span className={cn('whitespace-nowrap text-xs font-medium', HEALTH_TONE[h])}>{h}</span> : <span className="text-subtle">—</span>;
+    },
   }),
   col.accessor((r) => nextStep(r)?.dueDate ?? '9999', {
     id: 'next',
@@ -117,7 +171,7 @@ const columns = [
       return (
         <span className="flex min-w-0 items-center gap-2 text-xs">
           <span className="truncate">{s.label}</span>
-          <span className={cn('shrink-0 tnum', s.dueDate < today ? 'font-semibold text-st-rejected' : 'text-subtle')}>{fmtDate(s.dueDate)}</span>
+          <span className={cn('shrink-0 tnum', s.dueDate < today() ? 'font-semibold text-st-rejected' : 'text-subtle')}>{fmtDate(s.dueDate)}</span>
         </span>
       );
     },
@@ -126,7 +180,8 @@ const columns = [
 
 const COL_LABEL: Record<string, string> = {
   id: 'ID', name: 'Applicant', where: 'City · PIN', capacity: 'Capacity', experience: 'Experience', space: 'Space',
-  launch: 'Launch', language: 'Language', decision: 'Decision', next: 'Next step',
+  launch: 'Launch', language: 'Language', territory: 'Territory', score: 'Score', decision: 'Decision', outcome: 'Outcome', stage: 'Stage',
+  tasks: 'Tasks done', opening: 'Opening date', health: 'Health', next: 'Next step',
 };
 
 export default function ApplicantsPage() {
@@ -139,7 +194,7 @@ export default function ApplicantsPage() {
   const view = (params.get('view') as View | null) ?? 'all';
   const [search, setSearch] = useState('');
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [visibility, setVisibility] = useState<VisibilityState>({ experience: false, language: false });
+  const [visibility, setVisibility] = useState<VisibilityState>({ experience: false, language: false, launch: false, space: false, stage: false });
   const wide = useMediaQuery('(min-width: 900px)');
 
   const setView = (v: View) =>

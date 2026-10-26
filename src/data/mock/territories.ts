@@ -15,7 +15,7 @@ export const territories: Territory[] = [
   },
   {
     id: 'TER-03', name: 'Bengaluru North', city: 'Bengaluru', state: 'Karnataka', tier: 'Tier 1',
-    pins: ['560024', '560092', '560064', '560097', '560094', '560043'], openSlots: 2, priority: 'Medium',
+    pins: ['560024', '560092', '560064', '560097', '560094', '560043'], openSlots: 3, priority: 'Medium',
   },
   {
     id: 'TER-04', name: 'Mysuru City', city: 'Mysuru', state: 'Karnataka', tier: 'Tier 2',

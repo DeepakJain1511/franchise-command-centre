@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import type { CheckReport } from './checks';
+import type { Change } from './followups';
+import type { Alert, AppResult, DiffEntry, Override, PipelineResult, TaskStatus } from './model';
 
 /* ------------------------------------------------------------------ */
 /* Allowed values (from the judges' template "Allowed values" sheet)  */
@@ -42,18 +45,22 @@ export const Application = z.object({
   name: z.string(),
   city: City,
   state: z.literal('Karnataka'),
-  pin: Pin,
-  investmentLakh: z.number().nonnegative(),
-  experienceYears: z.number().nonnegative(),
+  /** As entered — usually 6 digits, but uploads may carry a bad value (flagged, never dropped). */
+  pin: z.string(),
+  /** Blank cells are null (spec §3.5) and turned into data-quality flags. */
+  investmentLakh: z.number().nonnegative().nullable(),
+  experienceYears: z.number().nonnegative().nullable(),
   business: z.string(), // may be blank / messy
   space: SpaceAvailable,
-  spaceSqft: z.number().positive().nullable(), // blank if no space
+  spaceSqft: z.number().nonnegative().nullable(), // blank if no space
   floor: Floor,
-  launchMonths: z.number().int().positive(),
+  launchMonths: z.number().nonnegative().nullable(),
   language: Language,
   notes: z.string(),
   /** ISO date the application was received (demo metadata, not in the sheet). */
   submittedAt: z.string(),
+  /** Original city text when it had to be inferred from the PIN (upload only). */
+  cityRaw: z.string().optional(),
 });
 export type Application = z.infer<typeof Application>;
 
@@ -101,12 +108,13 @@ export const STAGES = ['Applied', 'Screened', 'Approved', 'On hold', 'In onboard
 export const Stage = z.enum(STAGES);
 export type Stage = z.infer<typeof Stage>;
 
+/** Spec §14: Approved → Agreement → Licences → Fit-out → Training → Stock & staff → Soft launch → Open. */
 export const ONBOARDING_STEPS = [
   'Agreement',
-  'Space ready',
+  'Licences',
   'Fit-out',
   'Training',
-  'Stock & systems',
+  'Stock & staff',
   'Soft launch',
   'Open',
 ] as const;
@@ -128,6 +136,7 @@ export const ReasonTopic = z.enum([
   'pin',
   'data',
   'language',
+  'background',
 ]);
 export type ReasonTopic = z.infer<typeof ReasonTopic>;
 
@@ -179,11 +188,12 @@ export const DataFlag = z.object({
 });
 export type DataFlag = z.infer<typeof DataFlag>;
 
-export const Decision = z.object({
+export const DecisionBase = z.object({
   applicationId: z.string(),
   status: DecisionStatus,
   stage: Stage,
-  confidence: z.number().min(0).max(1), // visual only
+  /** Adjusted score as 0..1 (adjustedPct / 100). */
+  confidence: z.number().min(0).max(1),
   summary: z.string(), // one short sentence
   reasons: z.array(Reason).min(3).max(5),
   territoryId: z.string().nullable(),
@@ -201,7 +211,19 @@ export const Decision = z.object({
   /** Rank inside its territory among competing applicants (1 = first in line). */
   territoryRank: z.number().int().positive().nullable(),
 });
-export type Decision = z.infer<typeof Decision>;
+/** UI decision + the full rule trace from the pipeline (outcome code, scores, reasons, plan). */
+export type Decision = z.infer<typeof DecisionBase> & { result: AppResult; text: DecisionText };
+
+/** Pre-rendered English text for the company view (partner view renders per language). */
+export interface DecisionText {
+  outcome: string; // "Hold — slot reserved"
+  sub: string | null; // "until 2 Nov" / "#2 in line" / "Redirect to 570011"
+  main: string;
+  others: string[];
+  warnings: string[];
+  tips: string[];
+  nextSteps: string[];
+}
 
 export interface Explanation {
   applicationId: string;
@@ -253,15 +275,27 @@ export interface TerritoryState {
 /* ------------------------------------------------------------------ */
 
 export interface AskResponse {
-  kind: 'decision' | 'territory' | 'whatif' | 'fallback';
+  kind: 'decision' | 'territory' | 'whatif' | 'update' | 'next' | 'compare' | 'summary' | 'fallback';
   applicationId?: string;
   territoryId?: string;
   status?: DecisionStatus;
   reasons: Reason[];
+  /** One-line answer (spec §16 answer format: one line → Why → What next). */
   sentence: string;
+  why?: string[];
+  next?: string[];
   /** For territory answers: ranked competitors. */
-  ranked?: Array<{ applicationId: string; name: string; status: DecisionStatus }>;
+  ranked?: Array<{ applicationId: string; name: string; status: DecisionStatus; note?: string }>;
   suggestions?: string[];
+  /** Updates: what the parser understood, the assumptions it made, and every applicant that moved. */
+  understood?: string;
+  assumptions?: string[];
+  diff?: DiffEntry[];
+  overrideIds?: string[];
+  compare?: Array<{ applicationId: string; name: string; status: DecisionStatus; outcome: string; score: number; bar: number; factors: string[] }>;
+  counts?: Array<{ label: string; value: number }>;
+  /** 'gemini' when Gemini helped parse the message (the decision itself is always rule-based). */
+  source?: 'rules' | 'gemini';
 }
 
 export interface ScenarioChange {
@@ -269,8 +303,10 @@ export interface ScenarioChange {
   space?: SpaceAvailable;
   floor?: Floor;
   spaceSqft?: number | null;
-  launchMonths?: number;
-  investmentLakh?: number;
+  launchMonths?: number | null;
+  investmentLakh?: number | null;
+  experienceYears?: number | null;
+  pin?: string;
 }
 
 export interface ScenarioPreset {
@@ -290,7 +326,9 @@ export interface Ripple {
 export interface ScenarioResult {
   id: string;
   change: ScenarioChange;
+  /** True when the change moved anything (kept for the sandbox UI). */
   canned: boolean;
+  diff: DiffEntry[];
   before: { status: DecisionStatus; reasons: Reason[]; confidence: number };
   after: { status: DecisionStatus; reasons: Reason[]; confidence: number };
   /** Reason ids whose sentiment changed between before and after. */
@@ -305,9 +343,21 @@ export interface ScenarioResult {
 
 export interface ChatMessage {
   id: string;
-  from: 'partner' | 'brand';
+  /** 'assistant' = instant answer grounded in the engine; 'brand' = the relationship manager. */
+  from: 'partner' | 'brand' | 'assistant';
   text: string;
   at: string; // ISO date-time
+  /** Partner messages that look like data updates carry what the parser found, for the brand to apply. */
+  detected?: { understood: string; changes: Array<Pick<Change, 'field' | 'value' | 'label'>>; applied: boolean };
+}
+
+export interface InboxThread {
+  applicationId: string;
+  name: string;
+  status: DecisionStatus;
+  last: ChatMessage | null;
+  unread: number;
+  pendingUpdate: boolean;
 }
 
 export interface PartnerProfile {
@@ -392,4 +442,28 @@ export interface DecisionEngine {
   completeStaffModule(applicationId: string, staffId: string, moduleId: string): Promise<StaffRoster>;
   removeStaff(applicationId: string, staffId: string): Promise<StaffRoster>;
   reset(): Promise<void>;
+
+  /* ---- Spec §15–§16: time, actions, follow-ups, inbox, checks ---- */
+  /** Days since the decision date (time slider, 0 → 98). */
+  getDay(): number;
+  setDay(day: number): Promise<void>;
+  getPipeline(): Promise<PipelineResult>;
+  getAlerts(): Promise<Alert[]>;
+  getOverrides(): Override[];
+  /** Apply validated changes as overrides; returns the ids (for Undo) and the diff. */
+  applyChanges(changes: Change[], source: Override['source'], reason?: string): Promise<{ overrideIds: string[]; diff: DiffEntry[] }>;
+  undoLast(): Promise<DiffEntry[]>;
+  removeOverrides(ids: string[]): Promise<DiffEntry[]>;
+  resetOverrides(): Promise<void>;
+  setTaskStatus(applicationId: string, taskId: string, status: TaskStatus, by: 'partner' | 'company'): Promise<void>;
+  extendDeadline(applicationId: string, reason: string): Promise<DiffEntry[]>;
+  releaseReservation(applicationId: string, reason: string): Promise<DiffEntry[]>;
+  getInbox(): Promise<InboxThread[]>;
+  sendBrandMessage(applicationId: string, text: string): Promise<ChatMessage>;
+  markThreadRead(applicationId: string): Promise<void>;
+  suggestReply(applicationId: string): Promise<{ text: string; source: 'rules' | 'gemini' }>;
+  applyDetectedUpdate(applicationId: string, messageId: string): Promise<DiffEntry[]>;
+  runChecks(withGemini: boolean): Promise<CheckReport>;
 }
+
+export type { Alert, DiffEntry, Override, PipelineResult, TaskStatus, Change, CheckReport };

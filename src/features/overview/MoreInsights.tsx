@@ -21,7 +21,7 @@ function CapacityHistogram({ rows }: { rows: ApplicantRow[] }) {
   const { openApp } = useAppDrawer();
   const [sel, setSel] = useState<string | null>(null);
   const data = CAPACITY_BUCKETS.map((b) => {
-    const list = rows.filter((r) => r.app.investmentLakh >= b.min && r.app.investmentLakh < b.max);
+    const list = rows.filter((r) => (r.app.investmentLakh ?? -1) >= b.min && (r.app.investmentLakh ?? -1) < b.max);
     return { key: b.key, label: b.label, n: list.length, share: rows.length ? list.length / rows.length : 0, list };
   });
   const active = data.find((d) => d.key === sel);
@@ -78,7 +78,7 @@ function ExperienceScatter({ rows }: { rows: ApplicantRow[] }) {
     <ChartCard
       title="Experience vs capacity"
       info="Each dot is an applicant. Click a dot to open them."
-      table={<DataTable columns={['Applicant', 'Experience', 'Capacity']} rows={rows.map((r) => [r.app.name, `${r.app.experienceYears} yrs`, inrLakh(r.app.investmentLakh)])} />}
+      table={<DataTable columns={['Applicant', 'Experience', 'Capacity']} rows={rows.map((r) => [r.app.name, r.app.experienceYears === null ? 'Not given' : `${r.app.experienceYears} yrs`, inrLakh(r.app.investmentLakh)])} />}
     >
       <div className="h-44" role="img" aria-label="Scatter of retail experience against investment capacity">
         <ResponsiveContainer>

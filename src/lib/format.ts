@@ -5,7 +5,8 @@ const nf1 = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 1 });
 export const num = (n: number) => nf.format(n);
 
 /** Capacity in lakh -> "₹25 L" / "₹1.2 Cr" */
-export function inrLakh(lakh: number): string {
+export function inrLakh(lakh: number | null): string {
+  if (lakh === null || Number.isNaN(lakh)) return 'Not given';
   if (lakh >= 100) return `₹${nf1.format(lakh / 100)} Cr`;
   return `₹${nf1.format(lakh)} L`;
 }

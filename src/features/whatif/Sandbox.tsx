@@ -18,10 +18,14 @@ interface Draft {
   space: SpaceAvailable;
   floor: Floor;
   spaceSqft: number | null;
-  launchMonths: number;
+  launchMonths: number | null;
+  investmentLakh: number | null;
+  experienceYears: number | null;
 }
 
-const fromApp = (a: Application): Draft => ({ space: a.space, floor: a.floor, spaceSqft: a.spaceSqft, launchMonths: a.launchMonths });
+const fromApp = (a: Application): Draft => ({
+  space: a.space, floor: a.floor, spaceSqft: a.spaceSqft, launchMonths: a.launchMonths, investmentLakh: a.investmentLakh, experienceYears: a.experienceYears,
+});
 
 export interface SandboxRequest {
   appId: string;
@@ -41,7 +45,12 @@ export function Sandbox({ request }: { request: SandboxRequest | null }) {
   const addSimulation = useData((s) => s.addSimulation);
   const { openApp } = useAppDrawer();
 
-  const [appId, setAppId] = useState('APP-012');
+  const [appId, setAppId] = useState('');
+  // Default to the first suggested scenario (or the first applicant) once data is in.
+  useEffect(() => {
+    if (appId || !apps.data?.length) return;
+    setAppId(presets.data?.[0]?.applicationId ?? apps.data[0].app.id);
+  }, [appId, apps.data, presets.data]);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [result, setResult] = useState<ScenarioResult | null>(null);
 
@@ -79,7 +88,9 @@ export function Sandbox({ request }: { request: SandboxRequest | null }) {
         space: c.space ?? original.space,
         floor: c.floor ?? original.floor,
         spaceSqft: c.spaceSqft === undefined ? original.spaceSqft : c.spaceSqft,
-        launchMonths: c.launchMonths ?? original.launchMonths,
+        launchMonths: c.launchMonths === undefined ? original.launchMonths : c.launchMonths,
+        investmentLakh: c.investmentLakh === undefined ? original.investmentLakh : c.investmentLakh,
+        experienceYears: c.experienceYears === undefined ? original.experienceYears : c.experienceYears,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -109,7 +120,7 @@ export function Sandbox({ request }: { request: SandboxRequest | null }) {
       <header className="flex items-center gap-2 border-b px-4 py-3">
         <FlaskConical className="h-4 w-4 text-brand" aria-hidden />
         <h2 className="text-sm font-semibold">What-if sandbox</h2>
-        <span className="ml-auto text-2xs text-subtle">Outcomes are canned in Phase 1</span>
+        <span className="ml-auto text-2xs text-subtle">Full re-run · nothing saved until Apply</span>
       </header>
 
       <div className="space-y-4 p-4">
@@ -182,8 +193,14 @@ export function Sandbox({ request }: { request: SandboxRequest | null }) {
                     thumbLabel="Space size in square feet"
                   />
                 </Field>
-                <Field label="Target launch" edited={edited.includes('launchMonths')} value={`${draft.launchMonths} mo`}>
-                  <Slider min={1} max={12} step={1} value={[draft.launchMonths]} onValueChange={([v]) => setDraft({ ...draft, launchMonths: v })} thumbLabel="Months to launch" />
+                <Field label="Target launch" edited={edited.includes('launchMonths')} value={draft.launchMonths == null ? 'blank' : `${draft.launchMonths} mo`}>
+                  <Slider min={1} max={12} step={1} value={[draft.launchMonths ?? 6]} onValueChange={([v]) => setDraft({ ...draft, launchMonths: v })} thumbLabel="Months to launch" />
+                </Field>
+                <Field label="Investment" edited={edited.includes('investmentLakh')} value={draft.investmentLakh == null ? 'blank' : `₹${num(draft.investmentLakh)} L`}>
+                  <Slider min={5} max={200} step={1} value={[draft.investmentLakh ?? 25]} onValueChange={([v]) => setDraft({ ...draft, investmentLakh: v })} thumbLabel="Investment in lakh" />
+                </Field>
+                <Field label="Retail experience" edited={edited.includes('experienceYears')} value={draft.experienceYears == null ? 'blank' : `${draft.experienceYears} yrs`}>
+                  <Slider min={0} max={15} step={1} value={[draft.experienceYears ?? 0]} onValueChange={([v]) => setDraft({ ...draft, experienceYears: v })} thumbLabel="Years of retail experience" />
                 </Field>
                 <div className="flex gap-2 pt-1">
                   <Button variant="primary" className="flex-1" disabled={!edited.length || sim.loading} onClick={() => change && run(change)}>
@@ -331,7 +348,7 @@ function Diff({ result, applied, busy, onOpen, onApply, onRevert }: {
         </motion.div>
       </div>
       <div className="flex gap-4">
-        <Confidence value={result.before.confidence} label="Confidence before" />
+        <Confidence value={result.before.confidence} label="Score before" />
         <Confidence value={result.after.confidence} label="after" />
       </div>
       <p className="text-center text-sm">{result.sentence}</p>
@@ -370,7 +387,7 @@ function Diff({ result, applied, busy, onOpen, onApply, onRevert }: {
           </h3>
           <ul className="divide-y rounded-md border">
             {result.ripples.map((rp, i) => {
-              const isStatus = (v: string): v is DecisionStatus => ['Approved', 'On hold', 'Waitlisted', 'Rejected', 'Needs info'].includes(v);
+              const isStatus = (v: string): v is DecisionStatus => (['Approved', 'On hold', 'Waitlisted', 'Rejected', 'Needs info'] as string[]).includes(v);
               return (
                 <motion.li
                   key={rp.label}
@@ -410,7 +427,7 @@ function Diff({ result, applied, busy, onOpen, onApply, onRevert }: {
           </>
         ) : (
           <>
-            {!result.canned && <span className="text-2xs text-subtle">No decision change for this edit in the demo</span>}
+            {!result.canned && <span className="text-2xs text-subtle">No decision changes for this edit</span>}
             <Tooltip content={result.canned ? 'Update every screen with this outcome' : 'Nothing to apply — the decision does not change'}>
               <span className="ml-auto">
                 <Button variant="primary" onClick={onApply} disabled={!result.canned || busy}>

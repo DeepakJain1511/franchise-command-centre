@@ -7,7 +7,10 @@ import { useData } from '@/store/data';
 import { useFilters } from '@/store/filters';
 import { applyFilters, type ApplicantRow } from '@/lib/filtering';
 import { engine } from './index';
-import type { Dataset, Decision, Explanation, Language, PartnerProfile, PinState, ScenarioChange, ScenarioPreset, ScenarioResult, StaffRole, StaffRoster, TerritoryState } from './types';
+import type {
+  Alert, Change, CheckReport, Dataset, Decision, Explanation, InboxThread, Language, Override, PartnerProfile, PinState, PipelineResult, ScenarioChange,
+  ScenarioPreset, ScenarioResult, StaffRole, StaffRoster, TaskStatus, TerritoryState,
+} from './types';
 
 const cache = new Map<string, Promise<unknown>>();
 
@@ -74,9 +77,20 @@ function useAction<A extends unknown[], R>(fn: (...args: A) => Promise<R>) {
   return { run, loading };
 }
 
-export const useAsk = () => useAction((q: string) => engine.ask(q));
+/** Ask may apply an update (follow-ups, spec §16) — refresh every screen when it does. */
+export const useAsk = () =>
+  useAction(async (q: string) => {
+    const a = await engine.ask(q);
+    if (a.kind === 'update') useData.getState().bump();
+    return a;
+  });
 export const useSimulate = () => useAction((c: ScenarioChange) => engine.simulate(c));
-export const useSendPartnerMessage = () => useAction((id: string, text: string) => engine.sendPartnerMessage(id, text));
+export const useSendPartnerMessage = () =>
+  useAction(async (id: string, text: string) => {
+    const m = await engine.sendPartnerMessage(id, text);
+    useData.getState().bump();
+    return m;
+  });
 export const useStaffRoster = (id: string | null) => useEngineQuery<StaffRoster>(`staff:${id}`, () => engine.getStaff(id!), !!id);
 /** Staff actions resolve with the updated roster. */
 export function useStaffActions() {
@@ -125,3 +139,40 @@ export function useFilteredApplicants(ignore?: Parameters<typeof applyFilters>[2
   const data = useMemo(() => (q.data ? applyFilters(q.data, filters, ignore) : undefined), [q.data, filters, ignore]);
   return { ...q, data, all: q.data };
 }
+
+/* ---------------- Spec §15–§16: company actions, follow-ups, inbox, checks ---------------- */
+
+export const usePipeline = () => useEngineQuery<PipelineResult>('pipeline', () => engine.getPipeline());
+export const useAlerts = () => useEngineQuery<Alert[]>('alerts', () => engine.getAlerts());
+export const useInbox = () => useEngineQuery<InboxThread[]>('inbox', () => engine.getInbox());
+export function useOverrides(): Override[] {
+  const version = useData((s) => s.version);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => engine.getOverrides(), [version]);
+}
+
+/** Every mutating engine call goes through here so all screens refetch afterwards. */
+export function useEngineActions() {
+  const act = useAction(async <T,>(fn: () => Promise<T>): Promise<T> => {
+    const r = await fn();
+    useData.getState().bump();
+    return r;
+  });
+  const run = act.run as <T>(fn: () => Promise<T>) => Promise<T>;
+  return {
+    busy: act.loading,
+    setTask: (id: string, taskId: string, status: TaskStatus, by: 'partner' | 'company') => run(() => engine.setTaskStatus(id, taskId, status, by)),
+    extend: (id: string, reason: string) => run(() => engine.extendDeadline(id, reason)),
+    release: (id: string, reason: string) => run(() => engine.releaseReservation(id, reason)),
+    applyChanges: (changes: Change[], reason?: string) => run(() => engine.applyChanges(changes, 'form', reason)),
+    undoLast: () => run(() => engine.undoLast()),
+    removeOverrides: (ids: string[]) => run(() => engine.removeOverrides(ids)),
+    resetOverrides: () => run(() => engine.resetOverrides()),
+    sendBrand: (id: string, text: string) => run(() => engine.sendBrandMessage(id, text)),
+    markRead: (id: string) => run(() => engine.markThreadRead(id)),
+    applyDetected: (id: string, messageId: string) => run(() => engine.applyDetectedUpdate(id, messageId)),
+  };
+}
+
+export const useSuggestReply = () => useAction((id: string) => engine.suggestReply(id));
+export const useRunChecks = () => useAction((withGemini: boolean): Promise<CheckReport> => engine.runChecks(withGemini));

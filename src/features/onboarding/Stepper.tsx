@@ -12,10 +12,10 @@ export function isStepOverdue(step: { step: string; state: string; targetDate: s
 
 const SHORT: Record<string, string> = {
   Agreement: 'Agreement',
-  'Space ready': 'Space',
+  Licences: 'Licences',
   'Fit-out': 'Fit-out',
   Training: 'Training',
-  'Stock & systems': 'Stock',
+  'Stock & staff': 'Stock',
   'Soft launch': 'Soft launch',
   Open: 'Open',
 };

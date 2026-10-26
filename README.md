@@ -1,143 +1,96 @@
-# Bunty Consulting — Franchise Expansion (Phase 1 UI/UX)
+# Bunty Consulting — Franchise Partner Engine
 
-The front end of a tool that takes a franchise partner from **application → approved → onboarded → open store**,
-built for the "AI x Ops" hackathon (Case 1: Franchise Partner Acquisition, Geo-Selection & Onboarding).
+Takes a franchise partner from **application → decision → onboarding → open store**, built for the
+"AI x Ops" hackathon (Case 1: Franchise Partner Acquisition, Geo-Selection & Onboarding).
 
-> **Phase 1 is UI only.** Every decision comes from hand-written fixtures behind a swappable
-> `DecisionEngine`. There is no backend, no login and no secrets. See [PHASE2_TODO.md](PHASE2_TODO.md),
-> and [API.md](API.md) for the backend endpoints and request/response shapes.
+Every decision comes from a **rule engine that implements the Build Spec** (`Franchise_MVP_Build_Spec.md`):
+data-quality flags, gates, a 100-point fit score, cannibalisation penalties, approval bars by territory
+priority, slot allocation with local priority and the 15-point gap rule, **one store per PIN**, reservations
+and deadlines, explanations with reason codes, improvement tips and a 12-week onboarding plan.
+The engine is a pure function — `runPipeline(baseData, overrides, options) → results` — so the same data
+always gives the same answer, and every follow-up is a full re-run.
+
+**Gemini is optional and never decides.** With a key it (1) reads free-text follow-ups the rules don't
+understand, (2) drafts relationship-manager replies in the partner's language, and (3) independently
+recomputes the rubric so the checks agent can flag disagreements. Without a key, or if it is slow or
+rate-limited, everything falls back to rules — the link keeps working.
 
 ## Run it
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # engine guarantees + upload checks (16 tests)
+npm test           # 73 tests: spec scenarios 1–35, parser, checks agent
 npm run build      # static bundle in dist/
 ```
 
-**Deploy:** push to Vercel or Netlify with no settings — `vercel.json` and `public/_redirects` handle
-SPA routes. No environment variables.
+**Gemini (optional):** copy `.env.example` to `.env.local` and set `OPENROUTER_API_KEY` — Gemini is reached through
+the OpenRouter gateway, Google providers only (optionally `OPENROUTER_MODEL`, default `google/gemini-3.7-flash`). The key is read by the dev server and by the Vercel
+function `api/gemini.ts` — it is never in the browser bundle.
+
+**Deploy:** import the repo in Vercel (framework: Vite). Add `OPENROUTER_API_KEY` under Project → Settings →
+Environment Variables if you want Gemini. No login, no database. `vercel.json` keeps `/api/*` for the
+function and sends every other route to the SPA.
 
 ## Demo script (what a judge sees)
 
-1. **Land** on `/` → *Try with sample data* (or drop the Excel template). Staged progress, then a
-   data-quality summary; each chip previews the rows behind it. *Open dashboard*. (~5 s end to end.)
-2. **Overview** — click any KPI, funnel stage, donut slice, territory bar: the whole page cross-filters,
-   filters show as removable chips and sync to the URL. Double-click (or ⋯ → drill) to list the applicants.
-3. **Territory map** — Karnataka → city → territory → PIN hexes. Locks on PINs with a store or a planned
-   store, applicant counts, conflicts, catchment rings with cannibalisation hatching, area select, table view.
-4. **Any decision badge → "why"**: reason chips (✓ helped, ✕ hurt, ! missing) and a link to the full drawer.
-5. **Ask & What-if** — *"Why is APP-007 on hold?"*, then *"What if APP-012 finds a ground-floor space?"* →
-   *See the diff*: On hold → Approved, 3 reasons flip, TER-03 slots 1 → 0, APP-021 → Waitlisted.
-   *Apply change* updates every screen; *Revert* undoes it.
+1. **Land** on `/` → drop the Excel template (or *Try with sample data*; *Sample data (.xlsx)* downloads the
+   same data in the judges' format). Sheets are found by their headers; the grey example row is skipped;
+   problems become friendly messages or data-quality flags, never crashes.
+2. **Overview / Applicants** — every applicant has one outcome (Approve, Hold — slot reserved,
+   Redirect — slot reserved, Hold, Waitlist, Reject, Withdrawn) with the reason, score breakdown,
+   warnings and what to do next. Click any badge for the *why*; the drawer has the full trace.
+3. **Ask & What-if** — *"Why is APP-012 on hold?"* → one line, why, what next.
+   *"APP-012 has now found a ground-floor space"* → "Understood: space → Rented (assumed), floor → Ground,
+   size → unknown (assumed)" → 7-day hold to share the size. *"APP-012 space is 450 sq ft"* → Approved,
+   and every applicant that moved is listed (slots, queue positions). **Undo** on each update.
+4. **Partner portal** (`/partner`) — type an Application ID (no password). Shown in the applicant's language
+   (Kannada / Hindi / English toggle): status, why, score, tasks with *Mark as done*, training track,
+   buddy store, opening date; reservations show their tracker and deadline. Chat with the brand.
+5. **Partner inbox** — the brand side of the chat: partner messages, auto-replies from the engine, updates
+   detected in messages (*Apply update & re-run*), *Suggest reply*.
+6. **Time slider** (top bar, Day 0 → Week 14) — moves "today": tasks fall due, reservations lapse and the slot
+   goes to the next in line, health turns At risk / Delayed. Company actions: verify a task, extend a
+   deadline by 7 days (reason required), release a reservation.
+7. **Checks** — the checks agent re-audits every decision after each change (one store per PIN, slots,
+   score arithmetic, independent re-score, decision lines, money floor, redirects, gap rule, onboarding
+   plans, determinism). *Run full audit* adds the Gemini rubric cross-check.
 
-**Things to play with**
-- **Applications received** (Overview): drag the handles under the chart to pick dates — every widget
-  filters to that range and the numbers roll to their new values; click a week to zoom to it.
-- **Time-lapse** (Map): press ▶ to replay how applications arrived and stores got planned, week by week,
-  or drag the scrubber.
-- **Live what-if**: change space, floor or size in the sandbox and the outcome re-runs as you drag.
-- **Keyboard**: `G` then `O`/`M`/`A`/`P`/`T`/`N`/`W` jumps between screens, `/` searches, `?` lists shortcuts.
-- Cards follow the cursor with a soft spotlight; screens fade in with a gentle blur-in.
-
-Useful deep links: `/map?pin=560068`, `/map?territory=TER-02`, `/applicants?view=attention`,
-`/overview?status=On+hold`, `/applicants?app=APP-007`, `/dev/components` (component gallery).
-Press **Ctrl/⌘ K** anywhere to jump to an applicant, territory or screen.
+Everything the judge changes stays in **their browser only** (localStorage), and survives a refresh.
 
 ## Folder map
 
 ```
 src/
-  app/            App router, shell (sidebar, top bar), nav, page header, route errors
-  components/     Shared UI: chips & badges, KPI/chart cards, gauge, states, filter bar,
-                  side drawer, command palette, toaster; ui/ = Radix-based primitives
-  features/
-    upload/       Start screen + client-side workbook check (SheetJS, preview only)
-    overview/     KPI strip, funnel, decision donut, territory fill, attention queue, more insights
-    map/          Leaflet map, hex PIN layout, panels, coverage table
-    applicants/   TanStack table + the applicant drawer (decision / profile / next steps / onboarding / timeline)
-    pipeline/     Board (visual-only drag) / table / timeline
-    territories/  Card grid + territory detail
-    onboarding/   Partner steppers, training plan, cohort Gantt
-    whatif/       Ask chat + what-if sandbox (diff, ripples, apply/revert)
-    settings/     Theme, density, language preview, demo controls
-    dev/          /dev/components gallery
+  config.ts       Every rule number from the spec (§4) — no magic numbers elsewhere
   engine/
-    types.ts      Domain types (zod) + the DecisionEngine interface
-    mockEngine.ts The only implementation in Phase 1 (fixtures + fake latency)
-    index.ts      Exports the active engine — the one-line swap
-    hooks.ts      The only way components reach the engine
-  data/mock/      applications, territories, stores, pincodes (approximate), decisions, scenarios
-  store/          Zustand: filters (URL-synced), ui (theme/density/toasts), data (version, what-if history)
-  lib/            Formatters (₹ L / Cr, en-IN), tokens, hex layout, filtering, aggregation, hooks
-scripts/          Playwright helpers: screenshots, contact sheets, scripted flows, cognitive-load audit
+    parse.ts      Workbook → typed data (§3)            flags.ts      Data-quality flags (§6)
+    score.ts      Fit score, 5 factors (§7)             location.ts   Territories, cannibalisation, redirects (§9)
+    allocate.ts   Gates + slot allocation (§8, §10)     onboarding.ts Plan, tasks, training, health (§13, §15)
+    explain.ts    Reason text, warnings, tips (§12)     pipeline.ts   runPipeline(baseData, overrides, options)
+    diff.ts       Before/after comparison (§16)         followups.ts  Rule-based question / update parser (§16)
+    checks.ts     The checks agent                      present.ts    Engine result → UI shapes
+    realEngine.ts DecisionEngine: state, overrides, time slider, chat, Gemini fallbacks
+    types.ts      UI types + the DecisionEngine interface; hooks.ts — the only way components reach it
+  i18n/           en / kn / hi dictionaries (reason templates, tasks, partner UI) — fall back to English
+  features/       upload · overview · map · applicants · pipeline · territories · onboarding · whatif (Ask)
+                  · partner · inbox · checks · settings
+  data/mock/      Sample data (40 applications, 8 territories, the 10 stores), PIN centroids, placeholders
+server/gemini.ts  Gemini proxy with server-owned prompts (3 fixed tasks)   api/gemini.ts  Vercel function
+scripts/          make-sample-xlsx.mjs (public/sample_data.xlsx) + Playwright helpers
 ```
 
-## The DecisionEngine seam
+## Placeholders (kept on purpose — the data isn't available yet)
 
-```ts
-// src/engine/index.ts
-import { mockEngine } from './mockEngine';
-export const engine: DecisionEngine = mockEngine;   // ← swap this one import in Phase 2
-```
+See [PLACEHOLDERS.md](PLACEHOLDERS.md): payback estimate (out of the decision, spec §2), relationship
+managers' contact details, staff training/quiz scores, training module progress, approximate PIN centroids
+and catchment rings on the map. None of them affect a decision.
 
-Components never import fixtures; they call hooks such as `useDecisions`, `useExplanation`,
-`usePinStates`, `useTerritoryStates`, `useAsk`, `useSimulate` and `useScenarioCommit`. Hooks cache per data
-version, so applying a what-if bumps the version and every screen refetches.
+## Verification
 
-## What is mocked
-
-Everything that decides: statuses, reasons, confidence, ranks, next steps, onboarding dates, canned
-Q&A and what-if outcomes, and the approximate PIN centroids. Uploading a file runs a real **check**
-(sheets, headers, row counts, missing columns, friendly errors) but results still come from the sample
-set. Full list with file pointers: [PHASE2_TODO.md](PHASE2_TODO.md).
-
-**The one hard rule is enforced and tested:** no two approved/planned applicants share a PIN, and none
-share a PIN with an existing store — including after every canned what-if is applied
-(`src/engine/mockEngine.test.ts`). Locked PINs show a lock and "one store per PIN".
-
-## Design notes
-
-- **3-level disclosure:** glance (numbers, colour) → click (cross-filter, compact panel) → drawer/detail.
-- **Soft, warm palette:** ivory background, steel-blue accent, muted semantic colours — Approved green ·
-  On hold amber · Rejected rose · Waitlisted blue-grey · In onboarding indigo · Open teal · Needs info
-  violet. Priority is a steel-blue scale with bar glyphs. Colour is always paired with an icon or label;
-  avatars are neutral so colour only means something.
-- Light by default (dark only if picked in the top bar or Settings); dark is a calm slate, not black.
-  Inter with tabular numbers, 150–250 ms motion, `prefers-reduced-motion` respected.
-- **Map geography:** the Karnataka boundary is a simplified outline from the geohacker/india (GADM-derived)
-  state boundaries (`src/data/geo/karnataka.ts`, regenerate with `scripts/extract-karnataka.mjs`).
-  City markers sit on true city centres. PIN tiles are drawn at their locality's approximate centre
-  (checked against public PIN directories) — a test keeps every tile within ~2 tile widths of it.
-- Basemap: Esri Light/Dark Gray Canvas (no key). CARTO tiles, named in the brief, now return an
-  "API key required" watermark.
-
-## Verification done
-
-- `tsc` strict (no `any`), 16 unit tests, production build.
-- Playwright screenshots of every screen at 1440 px and 390 px, light and dark, reviewed and fixed.
-- Scripted flows (dev and production build): first run in ~5 s, blank-template error message, filled
-  workbook accepted, ask → diff → apply → APP-012 approved everywhere, cross-filter + URL sync,
-  Ctrl+K → drawer, catchment overlay, pipeline drag toast. No console errors.
-- Cognitive-load audit (`node scripts/audit.mjs`) — see below.
-
-### Cognitive-load audit (1440 × 900, above the fold)
-
-| Screen | Widgets | Words | Accent hues |
-|---|---|---|---|
-| Start | 1 | 49 | 2 |
-| Overview | 5 (KPI strip, funnel, donut, territory fill, attention) | 167 | 7 |
-| Map | 1 map + side panels | 142 | 7 |
-| Applicants | 1 table | 386 (data rows) | 3 |
-| Pipeline | 1 board | 289 (cards) | 6 |
-| Territories | 1 card grid | 89 | 6 |
-| Onboarding | 1 list + summary | 242 | 3 |
-| Ask & What-if | 2 | 109 | 1 |
-| Settings | 2 | 68 | 1 |
-
-Cut or simplified along the way: random-hue avatars → neutral (Applicants 13 → 3 hues, Overview 11 → 7);
-Experience and Language columns hidden by default; funnel conversion labels moved off the bars; the
-"oversubscribed" flame only where a territory is full *and* still in demand; store icons hidden at
-state zoom; "stuck" indicator raised from 14 to 21 days (it was on almost every card); "More insights"
-charts collapsed below the fold.
+- `npm test` — 39 acceptance tests (spec §18 scenarios 1–35 + worked numbers + follow-ups), 5 parser tests
+  (judges' template, header/format variants, friendly errors), 25 checks-agent runs over what-ifs and the
+  time slider, plus formatting/hex tests.
+- `tsc` strict, production build, browser walkthrough: sample → overview → drawer → Ask (APP-012 flow) →
+  partner portal in Hindi/Kannada → partner chat → inbox apply → time slider → checks; 375 px layout.
+- Translations (Kannada, Hindi) should be checked by a native speaker before the demo (spec §14).

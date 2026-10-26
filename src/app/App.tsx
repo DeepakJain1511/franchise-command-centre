@@ -17,6 +17,8 @@ const AskPage = lazy(() => import('@/features/whatif/AskPage'));
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'));
 const GalleryPage = lazy(() => import('@/features/dev/GalleryPage'));
 const PartnerPage = lazy(() => import('@/features/partner/PartnerPage'));
+const InboxPage = lazy(() => import('@/features/inbox/InboxPage'));
+const ChecksPage = lazy(() => import('@/features/checks/ChecksPage'));
 
 function PageFallback() {
   return (
@@ -50,6 +52,8 @@ const router = createBrowserRouter([
       { path: '/territories/:id', element: S(<TerritoryDetailPage />) },
       { path: '/onboarding', element: S(<OnboardingPage />) },
       { path: '/ask', element: S(<AskPage />) },
+      { path: '/inbox', element: S(<InboxPage />) },
+      { path: '/checks', element: S(<ChecksPage />) },
       { path: '/settings', element: S(<SettingsPage />) },
       { path: '/dev/components', element: S(<GalleryPage />) },
       { path: '*', element: <Navigate to="/overview" replace /> },

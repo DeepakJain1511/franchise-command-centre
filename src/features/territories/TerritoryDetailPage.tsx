@@ -6,7 +6,7 @@ import { PageHeader } from '@/app/AppShell';
 import { DecisionBadge, PinChip, PriorityChip, TierChip } from '@/components/chips';
 import { ChartCard, ChartSkeleton, DataTable, EmptyState, ErrorState, Gauge, Skeleton, Stat } from '@/components/data';
 import { Button } from '@/components/ui/button';
-import { useApplicants, useDataset, usePinStates, useTerritoryStates } from '@/engine/hooks';
+import { useApplicants, useDataset, usePinStates, usePipeline, useTerritoryStates } from '@/engine/hooks';
 import { inrLakh } from '@/lib/format';
 import { useAppDrawer, useColors } from '@/lib/hooks';
 import { PIN_META } from '@/lib/tokens';
@@ -20,6 +20,7 @@ export default function TerritoryDetailPage() {
   const ts = useTerritoryStates();
   const pins = usePinStates();
   const apps = useApplicants();
+  const pipe = usePipeline();
   const bump = useData((s) => s.bump);
   const navigate = useNavigate();
   const { openApp } = useAppDrawer();
@@ -57,6 +58,7 @@ export default function TerritoryDetailPage() {
   const stores = tPins.filter((p) => p.status === 'store').length;
   const ranked = s.competingIds.map((aid) => apps.data!.find((r) => r.app.id === aid)).filter((r): r is NonNullable<typeof r> => !!r);
   const chart = s.fillHistory.map((h) => ({ month: monthLabel(h.month), filled: h.filled, slots: s.openSlots }));
+  const tr = pipe.data?.territories.find((x) => x.id === id);
 
   return (
     <div className="pb-10">
@@ -85,6 +87,14 @@ export default function TerritoryDetailPage() {
         <section className="card flex flex-wrap items-center gap-x-8 gap-y-4 p-4" aria-label="Territory stats">
           <Gauge value={s.filled} max={s.openSlots} size={64} token={s.filled >= s.openSlots ? 'st-approved' : 'brand'} />
           <Stat label="Slots filled" value={`${s.filled}/${s.openSlots}`} />
+          {tr && (
+            <>
+              <Stat label="Approved" value={tr.approved.length} />
+              <Stat label="Reserved" value={tr.reserved.length} />
+              <Stat label="Remaining" value={tr.remaining} />
+              <Stat label="In queue" value={tr.queue.length} />
+            </>
+          )}
           <Stat label="Applicants" value={s.applicants} />
           <Stat label="PINs" value={t.pins.length} />
           <Stat label="Existing stores" value={stores} />
@@ -118,13 +128,14 @@ export default function TerritoryDetailPage() {
               <EmptyState title="No applicants yet — an open opportunity" />
             ) : (
               <div className="overflow-x-auto scrollbar-thin">
-                <table className="w-full min-w-[480px] text-sm">
+                <table className="w-full min-w-[560px] text-sm">
                   <thead className="text-left text-xs text-subtle">
                     <tr className="border-b">
                       <th className="py-1.5 pr-2 font-medium">#</th>
                       <th className="py-1.5 font-medium">Applicant</th>
                       <th className="py-1.5 font-medium">PIN</th>
-                      <th className="py-1.5 text-right font-medium">Capacity</th>
+                      <th className="py-1.5 text-right font-medium">Score</th>
+                      <th className="py-1.5 pl-3 font-medium">Slot / queue</th>
                       <th className="py-1.5 pl-3 font-medium">Decision</th>
                     </tr>
                   </thead>
@@ -142,7 +153,14 @@ export default function TerritoryDetailPage() {
                           <span className="font-medium">{app.name}</span> <span className="text-xs text-subtle tnum">{app.id}</span>
                         </td>
                         <td className="py-2 text-muted tnum">{app.pin}</td>
-                        <td className="py-2 text-right tnum">{inrLakh(app.investmentLakh)}</td>
+                        <td className="py-2 text-right tnum" title={`Capacity ${inrLakh(app.investmentLakh)}`}>{Math.round(decision.result.adjustedPct)}</td>
+                        <td className="py-2 pl-3 text-xs text-muted tnum">
+                          {decision.result.slotTerritoryId === id && decision.result.slotPin
+                            ? `Slot · ${decision.result.slotPin}`
+                            : tr?.queue.includes(app.id)
+                              ? `#${tr.queue.indexOf(app.id) + 1} in queue`
+                              : decision.text.sub ?? '—'}
+                        </td>
                         <td className="py-2 pl-3">
                           <DecisionBadge decision={decision} size="sm" />
                         </td>

@@ -15,12 +15,14 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Tooltip,
 } from '@/components/ui/overlay';
 import { ApplicantDrawer } from '@/features/applicants/ApplicantDrawer';
-import { loadDataset, resetDemo } from '@/lib/actions';
+import { ensureLoaded, loadDataset, resetDemo } from '@/lib/actions';
 import { cn } from '@/lib/cn';
 import { useReducedMotion } from '@/lib/hooks';
 import { useData } from '@/store/data';
 import { useUi } from '@/store/ui';
 import { NAV, NAV_FOOTER, type NavItem } from './nav';
+import { AlertsBell, ChecksBadge, SourcePill, TimeSlider } from './ShellExtras';
+import { useInbox } from '@/engine/hooks';
 
 function Brand({ collapsed }: { collapsed?: boolean }) {
   return (
@@ -50,7 +52,7 @@ function NavList({ items, collapsed, onNavigate }: { items: NavItem[]; collapsed
               onClick={onNavigate}
               className={({ isActive }) =>
                 cn(
-                  'group flex h-9 items-center gap-2.5 rounded-md px-2.5 text-sm font-medium transition-colors focus-ring',
+                  'group relative flex h-9 items-center gap-2.5 rounded-md px-2.5 text-sm font-medium transition-colors focus-ring',
                   isActive ? 'bg-surface text-fg shadow-soft ring-1 ring-border' : 'text-muted hover:bg-raised hover:text-fg',
                   collapsed && 'justify-center px-0',
                 )
@@ -60,6 +62,7 @@ function NavList({ items, collapsed, onNavigate }: { items: NavItem[]; collapsed
                 <>
                   <n.icon className={cn('h-4 w-4 shrink-0', isActive && 'text-brand')} aria-hidden />
                   {!collapsed && <span className="truncate">{n.label}</span>}
+                  {n.to === '/inbox' && <UnreadBadge collapsed={collapsed} />}
                 </>
               )}
             </NavLink>
@@ -67,6 +70,17 @@ function NavList({ items, collapsed, onNavigate }: { items: NavItem[]; collapsed
         </li>
       ))}
     </ul>
+  );
+}
+
+function UnreadBadge({ collapsed }: { collapsed: boolean }) {
+  const inbox = useInbox();
+  const n = (inbox.data ?? []).reduce((s, t) => s + t.unread, 0);
+  if (!n) return null;
+  return (
+    <span className={cn('rounded-full bg-brand px-1.5 text-[10px] font-semibold leading-4 text-brand-fg tnum', collapsed ? 'absolute ml-5 -mt-5' : 'ml-auto')} aria-label={`${n} unread`}>
+      {n}
+    </span>
   );
 }
 
@@ -127,8 +141,6 @@ function TopBar() {
   const toggleTheme = useUi((s) => s.toggleTheme);
   const setPalette = useUi((s) => s.setPaletteOpen);
   const toast = useUi((s) => s.toast);
-  const source = useData((s) => s.source);
-  const fileName = useData((s) => s.fileName);
   const navigate = useNavigate();
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -138,7 +150,7 @@ function TopBar() {
       <button
         type="button"
         onClick={() => setPalette(true)}
-        className="flex h-9 w-full max-w-sm items-center gap-2 rounded-md border bg-surface px-3 text-sm text-subtle shadow-soft transition-colors hover:text-muted focus-ring"
+        className="flex h-9 w-full min-w-0 max-w-sm items-center gap-2 rounded-md border bg-surface px-3 text-sm text-subtle shadow-soft transition-colors hover:text-muted focus-ring"
         aria-label="Search applicants, territories, screens"
       >
         <Search className="h-4 w-4" aria-hidden />
@@ -146,11 +158,10 @@ function TopBar() {
         <Kbd className="hidden sm:inline-flex">{isMac ? '⌘' : 'Ctrl'} K</Kbd>
       </button>
       <div className="ml-auto flex items-center gap-1.5">
-        <Tooltip content={source === 'upload' ? `Uploaded ${fileName ?? 'file'} · decisions are mocked in Phase 1` : 'Sample data · decisions are mocked in Phase 1'}>
-          <span className="hidden h-7 items-center gap-1.5 rounded-full border border-dashed border-brand/40 bg-brand-soft px-2.5 text-2xs font-medium text-brand sm:inline-flex">
-            <Database className="h-3 w-3" aria-hidden /> Demo data
-          </span>
-        </Tooltip>
+        <TimeSlider />
+        <ChecksBadge />
+        <SourcePill />
+        <AlertsBell />
         <Tooltip content={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
           <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
             {theme === 'dark' ? <Sun /> : <Moon />}
@@ -218,7 +229,7 @@ export function AppShell() {
 
   // Deep links work without visiting the start screen: quietly load the sample set.
   useEffect(() => {
-    if (!loaded) void loadDataset('sample');
+    if (!loaded) void ensureLoaded();
   }, [loaded]);
 
   useEffect(() => {

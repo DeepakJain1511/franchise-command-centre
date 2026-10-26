@@ -43,7 +43,7 @@ export function PaybackCard({ profile }: { profile: PartnerProfile }) {
   const label = !Number.isFinite(months) ? 'Not at these sales' : months < 12 ? `${Math.ceil(months)} months` : `${(months / 12).toFixed(1)} years`;
 
   return (
-    <Card title="Payback period" icon={<TrendingUp />} aside={<span className="text-2xs text-subtle">Estimate · {e.basis}</span>}>
+    <Card title="Payback period" icon={<TrendingUp />} aside={<span className="text-2xs text-subtle">Illustrative estimate · not part of the decision</span>}>
       <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
         <div>
           <div className="text-3xl font-semibold tracking-tight tnum">
@@ -174,7 +174,7 @@ export function ManagerCard({ profile }: { profile: PartnerProfile }) {
   );
 }
 
-const SUGGESTIONS = ['When will my store open?', 'How do I finish training?', 'Can you check my shop space?', 'Explain my payback'];
+const SUGGESTIONS = ['Why this decision?', 'When will my store open?', 'What should I do next?', 'I found a ground floor shop, 450 sq ft on rent'];
 
 export function ChatCard({ profile }: { profile: PartnerProfile }) {
   const [msgs, setMsgs] = useState<ChatMessage[]>(profile.messages);
@@ -205,7 +205,8 @@ export function ChatCard({ profile }: { profile: PartnerProfile }) {
         <AnimatePresence initial={false}>
           {msgs.map((m) => (
             <motion.div key={m.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className={cn('flex', m.from === 'partner' ? 'justify-end' : 'justify-start')}>
-              <div className={cn('max-w-[80%] rounded-2xl px-3.5 py-2 text-sm', m.from === 'partner' ? 'rounded-br-md bg-brand text-brand-fg' : 'rounded-bl-md bg-raised text-fg')}>
+              <div className={cn('max-w-[80%] rounded-2xl px-3.5 py-2 text-sm', m.from === 'partner' ? 'rounded-br-md bg-brand text-brand-fg' : m.from === 'assistant' ? 'rounded-bl-md border border-dashed bg-surface text-fg' : 'rounded-bl-md bg-raised text-fg')}>
+                {m.from !== 'partner' && <span className="mb-0.5 block text-2xs font-medium text-subtle">{m.from === 'assistant' ? 'Auto-reply' : first}</span>}
                 {m.text}
                 <div className={cn('mt-1 text-[10px]', m.from === 'partner' ? 'text-brand-fg/70' : 'text-subtle')}>{time(m.at)}</div>
               </div>

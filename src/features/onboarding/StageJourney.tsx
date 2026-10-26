@@ -11,10 +11,10 @@ type Row = ApplicantRow & { decision: ApplicantRow['decision'] & { onboarding: N
 
 const SHORT: Record<OnboardingStep, string> = {
   Agreement: 'Agreement',
-  'Space ready': 'Space ready',
+  Licences: 'Licences',
   'Fit-out': 'Fit-out',
   Training: 'Training',
-  'Stock & systems': 'Stock & systems',
+  'Stock & staff': 'Stock & staff',
   'Soft launch': 'Soft launch',
   Open: 'Open',
 };

@@ -1,15 +1,19 @@
 import {
-  AlertCircle, CalendarClock, CheckSquare, ClipboardList, GanttChartSquare, History, MapPin, MessageSquareText, Square, Store as StoreIcon, UserRound, Scale,
+  AlertCircle, AlertTriangle, BadgeCheck, CalendarClock, CalendarPlus, CheckSquare, ClipboardList, GanttChartSquare, History, Info, MapPin, MessageSquareText,
+  Square, Store as StoreIcon, TrendingUp, Undo2, Unlock, UserRound, Scale,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Avatar, FlagChip, LanguageBadge, PinChip, PriorityChip, ReasonChip, StageChip, StatusChip } from '@/components/chips';
+import { Avatar, FlagChip, LanguageBadge, PinChip, PriorityChip, ReasonChip, StatusChip } from '@/components/chips';
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/data';
 import { SideDrawer } from '@/components/SideDrawer';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/controls';
-import { useApplicants, useExplanation, usePinStates } from '@/engine/hooks';
-import type { Application, Decision, Explanation, Reason } from '@/engine/types';
+import { ScoreBreakdown } from '@/components/ScoreBreakdown';
+import { useApplicants, useEngineActions, useExplanation, usePinStates } from '@/engine/hooks';
+import type { Application, Decision, Explanation, Reason, TaskStatus } from '@/engine/types';
+import { t } from '@/i18n';
+import { useUi } from '@/store/ui';
 import { cn } from '@/lib/cn';
 import { inrLakh, sqft } from '@/lib/format';
 import { useAppDrawer, type DrawerTab } from '@/lib/hooks';
@@ -106,20 +110,6 @@ export function ApplicantDrawer() {
 
 /* ------------------------------------------------------------------ */
 
-function Confidence({ value }: { value: number }) {
-  const filled = Math.round(value * 5);
-  return (
-    <div className="flex items-center gap-2" title="Mock confidence — visual only in Phase 1">
-      <div className="flex gap-0.5" role="img" aria-label={`Confidence ${filled} of 5`}>
-        {[1, 2, 3, 4, 5].map((i) => (
-          <span key={i} className={cn('h-2 w-4 rounded-sm', i <= filled ? 'bg-brand' : 'bg-raised')} />
-        ))}
-      </div>
-      <span className="text-2xs text-subtle">confidence</span>
-    </div>
-  );
-}
-
 const SENT_ORDER: Record<Reason['sentiment'], number> = { hurt: 0, missing: 1, helped: 2 };
 
 function DecisionTab({ decision, app, onOpen, territoryPriority }: {
@@ -132,16 +122,16 @@ function DecisionTab({ decision, app, onOpen, territoryPriority }: {
   const pins = usePinStates();
   const pin = pins.data?.find((p) => p.pin === app.pin);
   const reasons = [...decision.reasons].sort((a, b) => SENT_ORDER[a.sentiment] - SENT_ORDER[b.sentiment]);
+  const r = decision.result;
+  const txt = decision.text;
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2.5">
         <StatusChip status={decision.status} size="lg" />
-        {decision.stage !== decision.status && <StageChip stage={decision.stage} size="sm" />}
-        <div className="ml-auto">
-          <Confidence value={decision.confidence} />
-        </div>
+        <span className="text-sm font-semibold">{txt.outcome}</span>
+        {txt.sub && <span className="rounded-full bg-raised px-2 py-0.5 text-xs text-muted tnum">{txt.sub}</span>}
       </div>
-      <p className="text-[15px] leading-snug">{decision.summary}</p>
+      <p className="text-[15px] leading-snug">{txt.main}</p>
 
       <section aria-label="Why">
         <div className="mb-2 flex items-center gap-3">
@@ -153,20 +143,54 @@ function DecisionTab({ decision, app, onOpen, territoryPriority }: {
           </span>
         </div>
         <div className="flex flex-wrap gap-2">
-          {reasons.map((r) => (
-            <ReasonChip key={r.id} reason={r} size="lg" />
+          {reasons.map((x) => (
+            <ReasonChip key={x.id} reason={x} size="lg" />
           ))}
         </div>
       </section>
 
+      <section aria-label="Score breakdown">
+        <h3 className="label mb-2">Score breakdown</h3>
+        <ScoreBreakdown r={r} />
+      </section>
+
+      {(txt.others.length > 0 || txt.warnings.length > 0) && (
+        <section aria-label="Also" className="space-y-1.5">
+          {txt.others.map((o, i) => (
+            <p key={`o${i}`} className="flex gap-2 text-sm text-muted">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-subtle" aria-hidden /> {o}
+            </p>
+          ))}
+          {txt.warnings.map((w, i) => (
+            <p key={`w${i}`} className="flex gap-2 text-sm text-st-hold">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {w}
+            </p>
+          ))}
+        </section>
+      )}
+
+      {txt.tips.length > 0 && (
+        <section aria-label="How to improve">
+          <h3 className="label mb-2">How to improve</h3>
+          <ul className="space-y-1">
+            {txt.tips.map((tip, i) => (
+              <li key={i} className="flex gap-2 text-sm">
+                <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-st-approved" aria-hidden /> {tip}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="flex flex-wrap items-center gap-2 rounded-md bg-raised/60 p-2.5">
         <MapPin className="h-4 w-4 text-subtle" aria-hidden />
         {pin && <PinChip pin={pin.pin} status={pin.status} />}
+        {r.slotPin && r.slotPin !== app.pin && <span className="text-xs text-muted tnum">→ slot at {r.slotPin}</span>}
         {decision.territoryId ? (
           <>
             <span className="text-xs text-muted tnum">{decision.territoryId}</span>
             {territoryPriority && <PriorityChip priority={territoryPriority} size="sm" />}
-            {decision.territoryRank && <span className="text-xs text-muted">#{decision.territoryRank} in line</span>}
+            {r.slotRank ? <span className="text-xs text-muted">slot #{r.slotRank}</span> : r.queuePosition ? <span className="text-xs text-muted">#{r.queuePosition} in line</span> : null}
           </>
         ) : (
           <span className="text-xs text-muted">No territory</span>
@@ -201,6 +225,8 @@ function DecisionTab({ decision, app, onOpen, territoryPriority }: {
 }
 
 function Competitors({ ex, self, app, onOpen }: { ex: Explanation; self: Decision; app: Application; onOpen: (id: string) => void }) {
+  const all = useApplicants();
+  const scores = new Map((all.data ?? []).map((x) => [x.app.id, Math.round(x.decision.result.adjustedPct)]));
   const rows = [
     { applicationId: self.applicationId, name: app.name, status: self.status, rank: self.territoryRank, investmentLakh: app.investmentLakh, self: true },
     ...ex.competitors.map((c) => ({ ...c, self: false })),
@@ -215,6 +241,7 @@ function Competitors({ ex, self, app, onOpen }: { ex: Explanation; self: Decisio
               <th className="px-2.5 py-1.5 font-medium">#</th>
               <th className="px-2.5 py-1.5 font-medium">Applicant</th>
               <th className="px-2.5 py-1.5 text-right font-medium">Capacity</th>
+              <th className="px-2.5 py-1.5 text-right font-medium">Score</th>
               <th className="px-2.5 py-1.5 font-medium">Status</th>
             </tr>
           </thead>
@@ -231,6 +258,7 @@ function Competitors({ ex, self, app, onOpen }: { ex: Explanation; self: Decisio
                   {r.self && <span className="ml-1 text-2xs text-brand">you</span>}
                 </td>
                 <td className="px-2.5 py-1.5 text-right tnum">{inrLakh(r.investmentLakh)}</td>
+                <td className="px-2.5 py-1.5 text-right tnum">{scores.get(r.applicationId) ?? '—'}</td>
                 <td className="px-2.5 py-1.5">
                   <StatusChip status={r.status} size="sm" />
                 </td>
@@ -277,12 +305,12 @@ function ProfileTab({ app, decision }: { app: Application; decision: Decision })
         <F field="id" label="Application ID" value={<span className="tnum">{app.id}</span>} />
         <F field="city" label="City" value={`${app.city}, ${app.state}`} />
         <F field="pin" label="PIN code" value={<span className="tnum">{app.pin}</span>} />
-        <F field="investmentLakh" label="Investment capacity" value={<span className="tnum">{inrLakh(app.investmentLakh)}</span>} />
-        <F field="experienceYears" label="Retail experience" value={<span className="tnum">{app.experienceYears} yrs</span>} />
+        <F field="investmentLakh" label="Investment capacity" value={app.investmentLakh === null ? '' : <span className="tnum">{inrLakh(app.investmentLakh)}</span>} />
+        <F field="experienceYears" label="Retail experience" value={app.experienceYears === null ? '' : <span className="tnum">{app.experienceYears} yrs</span>} />
         <F field="space" label="Space available" value={app.space} />
         <F field="spaceSqft" label="Space size" value={sqft(app.spaceSqft)} />
         <F field="floor" label="Floor" value={app.floor} />
-        <F field="launchMonths" label="Target launch" value={<span className="tnum">{app.launchMonths} month{app.launchMonths > 1 ? 's' : ''}</span>} />
+        <F field="launchMonths" label="Target launch" value={app.launchMonths === null ? '' : <span className="tnum">{app.launchMonths} month{app.launchMonths === 1 ? '' : 's'}</span>} />
         <F field="language" label="Training language" value={<LanguageBadge language={app.language} size="sm" />} />
         <F field="submittedAt" label="Received" value={fmtDateLong(app.submittedAt)} />
         <F field="business" label="Current / past business" value={app.business} wide />
@@ -294,78 +322,217 @@ function ProfileTab({ app, decision }: { app: Application; decision: Decision })
 
 /* ------------------------------------------------------------------ */
 
+const TASK_TONE: Record<TaskStatus, string> = {
+  'Not started': 'text-muted',
+  'Done — awaiting check': 'text-st-hold',
+  Verified: 'text-st-approved',
+};
+
 function NextStepsTab({ decision }: { decision: Decision }) {
-  const [done, setDone] = useState<Record<string, boolean>>({});
+  const r = decision.result;
+  const act = useEngineActions();
+  const toast = useUi((x) => x.toast);
+  const [reasonFor, setReasonFor] = useState<'extend' | 'release' | null>(null);
+  const [reason, setReason] = useState('');
   const today = iso(DEMO_TODAY);
-  if (!decision.nextSteps.length) return <EmptyState title="No next steps" />;
+  const tasks = r.outcome === 'APPROVE' ? r.onboarding?.tasks ?? [] : [];
+
+  const submitReason = async () => {
+    if (!reason.trim() || !reasonFor) return;
+    const diff = reasonFor === 'extend' ? await act.extend(r.id, reason.trim()) : await act.release(r.id, reason.trim());
+    toast(
+      reasonFor === 'extend' ? 'Deadline extended by 7 days' : `Reservation released${diff.length ? ` — ${diff.length} applicant${diff.length > 1 ? 's' : ''} moved` : ''}`,
+      'success',
+    );
+    setReasonFor(null);
+    setReason('');
+  };
+
   return (
-    <ul className="space-y-2">
-      {decision.nextSteps.map((s) => {
-        const isDone = done[s.id] ?? s.done;
-        const overdue = !isDone && s.dueDate < today;
-        return (
-          <li key={s.id} className="flex items-center gap-3 rounded-md border px-3 py-2.5">
-            <button
-              type="button"
-              onClick={() => setDone((d) => ({ ...d, [s.id]: !isDone }))}
-              className="text-muted hover:text-fg focus-ring"
-              aria-label={isDone ? `Mark "${s.label}" not done` : `Mark "${s.label}" done`}
-              aria-pressed={isDone}
-            >
-              {isDone ? <CheckSquare className="h-4 w-4 text-st-approved" /> : <Square className="h-4 w-4" />}
-            </button>
-            <span className={cn('flex-1 text-sm', isDone && 'text-subtle line-through')}>{s.label}</span>
-            <span className="hidden rounded-full bg-raised px-2 py-0.5 text-2xs text-muted sm:inline">{s.owner}</span>
-            <span className={cn('flex items-center gap-1 text-xs tnum', overdue ? 'font-semibold text-st-rejected' : 'text-muted')}>
-              <CalendarClock className="h-3.5 w-3.5" aria-hidden />
-              {fmtDate(s.dueDate)}
+    <div className="space-y-4">
+      {r.reservation && (
+        <div className="space-y-2 rounded-md border border-st-hold/30 bg-st-hold/[0.06] p-3">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <CalendarClock className="h-4 w-4 text-st-hold" aria-hidden />
+            <span className="font-medium">
+              Slot reserved at {r.reservation.pin} ({r.reservation.territoryId})
             </span>
-          </li>
-        );
-      })}
-    </ul>
+            <span className="ml-auto text-xs tnum text-muted">
+              until {fmtDateLong(r.reservation.deadline)}
+              {r.reservation.extendedDays ? ` (+${r.reservation.extendedDays}d)` : ''}
+            </span>
+          </div>
+          {r.reservation.milestones && (
+            <ol className="flex flex-wrap gap-1.5">
+              {r.reservation.milestones.map((m) => (
+                <li key={m.key} className={cn('rounded-full border px-2 py-0.5 text-2xs', m.done ? 'border-st-approved/40 text-st-approved' : 'text-muted')}>
+                  {m.done ? '✓ ' : ''}
+                  {m.key === 'accept' ? 'Accept' : m.key === 'space' ? 'Space' : 'Verified'} · {fmtDate(m.due)}
+                </li>
+              ))}
+            </ol>
+          )}
+          {reasonFor ? (
+            <form
+              className="flex flex-wrap gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void submitReason();
+              }}
+            >
+              <label htmlFor="act-reason" className="sr-only">
+                Reason
+              </label>
+              <input
+                id="act-reason"
+                autoFocus
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder={reasonFor === 'extend' ? 'Reason for the extension (required)' : 'Reason for releasing (required)'}
+                className="h-8 min-w-0 flex-1 rounded-md border bg-surface px-2.5 text-sm focus-ring"
+              />
+              <Button size="sm" variant="primary" type="submit" disabled={!reason.trim() || act.busy}>
+                {reasonFor === 'extend' ? 'Extend +7 days' : 'Release slot'}
+              </Button>
+              <Button size="sm" type="button" onClick={() => setReasonFor(null)}>
+                Cancel
+              </Button>
+            </form>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => setReasonFor('extend')}>
+                <CalendarPlus /> Extend 7 days
+              </Button>
+              <Button size="sm" onClick={() => setReasonFor('release')}>
+                <Unlock /> Release reservation
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tasks.length > 0 ? (
+        <ul className="space-y-2">
+          {tasks.map((tk) => {
+            const overdue = tk.status === 'Not started' && tk.dueDate < today;
+            return (
+              <li key={tk.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border px-3 py-2.5">
+                {tk.status === 'Verified' ? (
+                  <CheckSquare className="h-4 w-4 text-st-approved" aria-hidden />
+                ) : (
+                  <Square className={cn('h-4 w-4', tk.status === 'Done — awaiting check' ? 'text-st-hold' : 'text-muted')} aria-hidden />
+                )}
+                <span className={cn('min-w-0 flex-1 text-sm', tk.status === 'Verified' && 'text-subtle line-through')}>{t('en', tk.code)}</span>
+                <span className={cn('text-2xs', TASK_TONE[tk.status])}>{overdue ? `Overdue ${tk.overdueDays}d` : tk.status}</span>
+                <span className={cn('flex items-center gap-1 text-xs tnum', overdue ? 'font-semibold text-st-rejected' : 'text-muted')}>
+                  <CalendarClock className="h-3.5 w-3.5" aria-hidden />
+                  wk {tk.dueWeek} · {fmtDate(tk.dueDate)}
+                </span>
+                {tk.status === 'Done — awaiting check' && (
+                  <Button size="sm" variant="primary" disabled={act.busy} onClick={() => act.setTask(r.id, tk.id, 'Verified', 'company')}>
+                    <BadgeCheck /> Verify
+                  </Button>
+                )}
+                {tk.status === 'Not started' && (
+                  <Button size="sm" disabled={act.busy} onClick={() => act.setTask(r.id, tk.id, 'Done — awaiting check', 'company')} title="Record that the partner finished this">
+                    Mark done
+                  </Button>
+                )}
+                {tk.status === 'Verified' && (
+                  <Button size="sm" variant="ghost" disabled={act.busy} onClick={() => act.setTask(r.id, tk.id, 'Not started', 'company')} aria-label="Reopen task">
+                    <Undo2 />
+                  </Button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ) : decision.nextSteps.length ? (
+        <ul className="space-y-2">
+          {decision.nextSteps.map((st) => (
+            <li key={st.id} className="flex items-center gap-3 rounded-md border px-3 py-2.5">
+              {st.done ? <CheckSquare className="h-4 w-4 text-st-approved" aria-hidden /> : <Square className="h-4 w-4 text-muted" aria-hidden />}
+              <span className="flex-1 text-sm">{st.label}</span>
+              <span className="hidden rounded-full bg-raised px-2 py-0.5 text-2xs text-muted sm:inline">{st.owner}</span>
+              {r.reservation && st.owner === 'Partner' && <span className="text-xs tnum text-muted">{fmtDate(st.dueDate)}</span>}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <EmptyState title="No next steps" />
+      )}
+    </div>
   );
 }
 
 function OnboardingTab({ decision, app }: { decision: Decision; app: Application }) {
   const plan = decision.onboarding;
-  if (!plan) {
+  const p = decision.result.onboarding;
+  if (!p) {
     return <EmptyState title="Onboarding starts after approval" icon={<GanttChartSquare className="h-5 w-5" />} />;
   }
   const modules = trainingFor(plan);
+  const note = p.openingNote === 'TARGET_MET' ? (p.bufferWeeks > 0 ? t('en', 'OPEN_TARGET_MET', { buffer: p.bufferWeeks }) : t('en', 'OPEN_TARGET_EXACT')) : t('en', `OPEN_${p.openingNote}`);
+  const shown = modules.length ? modules : p.modules.map((m) => ({ id: m.code, title: t('en', m.code), week: m.week, hours: 0, progress: 0 }));
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between text-xs text-muted">
-        <span>
-          Now: <span className="font-medium text-fg">{plan.current}</span>
-        </span>
-        <span className="tnum">Target open {fmtDate(plan.targetOpen)}</span>
-      </div>
-      <OnboardingStepper plan={plan} />
-      {plan.atRisk && (
-        <div className="flex items-center gap-2 rounded-md bg-st-hold/10 px-3 py-2 text-xs text-st-hold">
-          <AlertCircle className="h-4 w-4" aria-hidden /> {plan.riskNote}
+      {p.preview && (
+        <div className="flex items-center gap-2 rounded-md bg-raised px-3 py-2 text-xs text-muted">
+          <Info className="h-4 w-4 shrink-0" aria-hidden /> Preview — the plan starts once the reservation becomes an approval.
         </div>
       )}
+      <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+        <Fact label="Week 1" value={fmtDate(p.startDate)} />
+        <Fact label="Opening" value={`${fmtDate(p.openingDate)} · wk ${p.openingWeeks}`} />
+        <Fact label="Training" value={`${p.track[0].toUpperCase()}${p.track.slice(1)} · ${p.trainingWeeks} wks`} />
+        <Fact label="Buddy store" value={p.buddyStoreId} />
+      </div>
+      <p className="text-sm text-muted">
+        {note}
+        {p.mall ? ' Mall unit: +2 weeks for mall approval and fit-out.' : ''}
+      </p>
+      {p.occasion && (
+        <p className={cn('flex gap-2 text-sm', p.occasion.met ? 'text-st-approved' : 'text-st-hold')}>
+          <CalendarClock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          Notes mention {p.occasion.label} ({fmtDate(p.occasion.date)}) — {p.occasion.met ? 'the opening is before it.' : 'the earliest safe opening is after it.'}
+        </p>
+      )}
+      {plan && <OnboardingStepper plan={plan} />}
+      {plan?.atRisk && (
+        <div className="flex items-center gap-2 rounded-md bg-st-hold/10 px-3 py-2 text-xs text-st-hold">
+          <AlertCircle className="h-4 w-4" aria-hidden /> {p.health}: {plan.riskNote}
+        </div>
+      )}
+      {p.firstTimeOwner && <p className="text-xs text-muted">{t('en', 'FIRST_TIME_OWNER')}</p>}
       <section>
         <div className="mb-2 flex items-center justify-between">
           <h3 className="label">Training plan</h3>
           <LanguageBadge language={app.language} size="sm" />
         </div>
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {modules.map((m) => (
+          {shown.map((m) => (
             <li key={m.id} className="flex items-center gap-2.5 rounded-md border px-3 py-2">
               <Ring value={m.progress} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm">{m.title}</span>
                 <span className="text-2xs text-subtle tnum">
-                  Wk {m.week} · {m.hours} h
+                  Wk {m.week}
+                  {m.hours ? ` · ${m.hours} h` : ''}
                 </span>
               </span>
             </li>
           ))}
         </ul>
       </section>
+    </div>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border px-2.5 py-1.5">
+      <div className="text-2xs text-subtle">{label}</div>
+      <div className="font-medium tnum">{value}</div>
     </div>
   );
 }
